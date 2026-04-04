@@ -1,0 +1,23 @@
+
+db.url=jdbc:mysql://localhost:3306/bank_simulation?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+db.username=root
+db.password=YOUR_DATABASE_PASSWORD_HERE
+
+  
+app.name=Bank Simulator
+app.version=1.0.0
+
+
+email.smtp.host=smtp.gmail.com
+email.smtp.port=587
+email.smtp.auth=true
+email.smtp.starttls.enable=true
+email.smtp.ssl.trust=smtp.gmail.com
+
+
+email.from=YOUR_EMAIL@gmail.com
+email.username=YOUR_EMAIL@gmail.com
+email.password=YOUR_16_CHAR_APP_PASSWORD
+
+
+email.enabled=true

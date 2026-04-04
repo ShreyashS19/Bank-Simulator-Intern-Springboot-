@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Banking Theme - Professional Navy & Teal */
+    --background: 0 0% 98%;
+    --foreground: 222 70% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 70% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 70% 15%;
+
+    --primary: 222 70% 33%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 187 85% 43%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 187 85% 53%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 222 70% 33%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar - Fixed Navy Theme */
+    --sidebar-background: 222 70% 33%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 187 85% 43%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 70% 28%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 222 70% 28%;
+    --sidebar-ring: 187 85% 53%;
+
+    /* Custom Banking Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(222 70% 33%), hsl(187 85% 43%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(210 40% 98%));
+    
+    /* Shadows */
+    --shadow-soft: 0 2px 8px -2px hsl(222 70% 33% / 0.1);
+    --shadow-medium: 0 4px 16px -4px hsl(222 70% 33% / 0.15);
+    --shadow-strong: 0 8px 24px -8px hsl(222 70% 33% / 0.2);
+    
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark {
+    --background: 222 70% 8%;
+    --foreground: 0 0% 98%;
+
+    --card: 222 70% 12%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 222 70% 12%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 187 85% 43%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 70% 20%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 222 70% 20%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 187 85% 53%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 222 70% 20%;
+    --input: 222 70% 20%;
+    --ring: 187 85% 53%;
+
+    --sidebar-background: 222 70% 10%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 187 85% 43%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 70% 15%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 222 70% 15%;
+    --sidebar-ring: 187 85% 53%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
