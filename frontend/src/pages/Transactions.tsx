@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Search, ArrowLeftRight, CheckCircle, TrendingUp, Download, Loader2 } from "lucide-react";
 import { transactionService, Transaction } from "@/services/transactionService";
+import { PaymentModal, playSFX } from "@/components/PaymentModal";
 
 const Transactions = () => {
   const [searchedTransactions, setSearchedTransactions] = useState<Transaction[]>([]);
@@ -15,6 +16,21 @@ const Transactions = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [modal, setModal] = useState<{
+    isOpen: boolean;
+    status: 'processing' | 'success' | 'error';
+    step: 'Initiating' | 'Processing' | 'Finalizing';
+    txnId?: string;
+    errorMessage?: string;
+    amount: string;
+    receiver: string;
+  }>({
+    isOpen: false,
+    status: 'processing',
+    step: 'Initiating',
+    amount: '',
+    receiver: '',
+  });
   const [formData, setFormData] = useState({
     senderAccountNumber: "",
     receiverAccountNumber: "",
@@ -82,35 +98,67 @@ const Transactions = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    // Freeze the captured form values before we reset
+    const snapshot = { ...formData };
+
     setIsCreating(true);
+    setModal({
+      isOpen: true,
+      status: 'processing',
+      step: 'Initiating',
+      amount: snapshot.amount,
+      receiver: snapshot.receiverAccountNumber,
+    });
+    playSFX('tick');
 
     try {
+      // Simulated step pacing for visual polish
+      await new Promise(r => setTimeout(r, 700));
+      setModal(prev => ({ ...prev, step: 'Processing' }));
+
       const transactionData = {
-        senderAccountNumber: formData.senderAccountNumber.trim(),
-        receiverAccountNumber: formData.receiverAccountNumber.trim(),
-        amount: parseFloat(formData.amount),
-        transactionType: "ONLINE", 
-        description: formData.description.trim() || undefined,
-        pin: formData.pin.trim(),
-        timestamp: new Date().toISOString()
+        senderAccountNumber: snapshot.senderAccountNumber.trim(),
+        receiverAccountNumber: snapshot.receiverAccountNumber.trim(),
+        amount: parseFloat(snapshot.amount),
+        transactionType: "ONLINE" as const,
+        description: snapshot.description.trim() || undefined,
+        pin: snapshot.pin.trim(),
+        timestamp: new Date().toISOString(),
       };
 
       const transactionId = await transactionService.createTransaction(transactionData);
-      toast.success(`Transaction completed successfully!`);
-      handleReset();
 
-      if (searchAccountNumber === formData.senderAccountNumber || searchAccountNumber === formData.receiverAccountNumber) {
+      setModal(prev => ({ ...prev, step: 'Finalizing' }));
+      await new Promise(r => setTimeout(r, 600));
+
+      handleReset();
+      setModal(prev => ({
+        ...prev,
+        status: 'success',
+        txnId: String(transactionId ?? 'TXN_OK'),
+      }));
+      playSFX('success');
+
+      if (
+        searchAccountNumber === snapshot.senderAccountNumber ||
+        searchAccountNumber === snapshot.receiverAccountNumber
+      ) {
         handleSearchByAccount();
       }
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || "Transaction failed. Please try again.";
+      const errorMessage =
+        error.response?.data?.message || 'Transaction failed. Please try again.';
+      setModal(prev => ({ ...prev, status: 'error', errorMessage }));
+      playSFX('error');
       toast.error(errorMessage);
     } finally {
       setIsCreating(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData, searchAccountNumber]);
 
   const handleReset = () => {
     setFormData({
@@ -264,10 +312,12 @@ const Transactions = () => {
                       Processing...
                     </>
                   ) : (
-                    "Create Transaction"
+                    'Create Transaction'
                   )}
                 </Button>
-                <Button type="button" variant="outline" onClick={handleReset}>Reset</Button>
+                <Button type="button" variant="outline" onClick={handleReset} disabled={isCreating}>
+                  Reset
+                </Button>
               </div>
             </form>
             
@@ -408,6 +458,21 @@ const Transactions = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Payment Modal ── */}
+      <PaymentModal
+        isOpen={modal.isOpen}
+        status={modal.status}
+        step={modal.step}
+        paymentDetails={{
+          amount: modal.amount,
+          receiver: modal.receiver,
+          txnId: modal.txnId,
+        }}
+        errorMessage={modal.errorMessage}
+        onClose={() => setModal(prev => ({ ...prev, isOpen: false }))}
+        onRetry={() => handleSubmit()}
+      />
     </DashboardLayout>
   );
 };

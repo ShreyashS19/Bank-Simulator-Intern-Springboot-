@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { LogIn, Loader2, Shield } from "lucide-react";
 import { authService } from "@/services/authService";
+import LoginTransitionOverlay from "@/components/LoginTransitionOverlay";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -16,6 +17,12 @@ const Login = () => {
     password: ""
   });
   const [loading, setLoading] = useState(false);
+  // Transition overlay state
+  const [transition, setTransition] = useState<{ show: boolean; userName: string; target: string }>({
+    show: false,
+    userName: '',
+    target: '/dashboard',
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,10 +59,10 @@ const Login = () => {
             description: 'Redirecting to admin dashboard...',
             icon: <Shield className="h-4 w-4" />
           });
-          setTimeout(() => navigate('/admin'), 500);
+          setTransition({ show: true, userName: user.fullName || user.email, target: '/admin' });
         } else {
           toast.success("Login successful!");
-          navigate("/dashboard");
+          setTransition({ show: true, userName: user.fullName || user.email, target: '/dashboard' });
         }
       } else {
         toast.error(response.message || "Login failed");
@@ -98,6 +105,13 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
+      {/* Transition overlay — mounts on top of everything after auth */}
+      {transition.show && (
+        <LoginTransitionOverlay
+          userName={transition.userName}
+          onComplete={() => navigate(transition.target)}
+        />
+      )}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}

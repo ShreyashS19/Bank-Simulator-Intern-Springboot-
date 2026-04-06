@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, CreditCard, ArrowLeftRight, TrendingUp, Loader2 } from "lucide-react";
@@ -162,13 +163,27 @@ const Dashboard = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8">
-        <div>
+      <motion.div
+        className="space-y-8"
+        initial="hidden"
+        animate="visible"
+        variants={{
+          hidden: {},
+          visible: { transition: { staggerChildren: 0.08 } },
+        }}
+      >
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } } }}
+        >
           <h1 className="text-3xl font-bold text-foreground">Dashboard Overview</h1>
           <p className="text-muted-foreground mt-1">Welcome back! Here's what's happening today.</p>
-        </div>
+        </motion.div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <motion.div
+          className="grid gap-6 md:grid-cols-2 lg:grid-cols-4"
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}
+        >
+          <motion.div variants={{ hidden: { opacity: 0, y: 20, scale: 0.97 }, visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.45, ease: 'easeOut' } } }}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Customers</CardTitle>
@@ -181,7 +196,9 @@ const Dashboard = () => {
               </p>
             </CardContent>
           </Card>
+          </motion.div>
 
+          <motion.div variants={{ hidden: { opacity: 0, y: 20, scale: 0.97 }, visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.45, ease: 'easeOut' } } }}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Active Accounts</CardTitle>
@@ -194,7 +211,9 @@ const Dashboard = () => {
               </p>
             </CardContent>
           </Card>
+          </motion.div>
 
+          <motion.div variants={{ hidden: { opacity: 0, y: 20, scale: 0.97 }, visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.45, ease: 'easeOut' } } }}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Transactions</CardTitle>
@@ -207,7 +226,9 @@ const Dashboard = () => {
               </p>
             </CardContent>
           </Card>
+          </motion.div>
 
+          <motion.div variants={{ hidden: { opacity: 0, y: 20, scale: 0.97 }, visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.45, ease: 'easeOut' } } }}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Volume</CardTitle>
@@ -220,9 +241,13 @@ const Dashboard = () => {
               </p>
             </CardContent>
           </Card>
-        </div>
+          </motion.div>
+        </motion.div>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <motion.div
+          className="grid gap-6 md:grid-cols-2"
+          variants={{ hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: 'easeOut' } } }}
+        >
           <Card>
             <CardHeader>
               <CardTitle>Transactions Overview</CardTitle>
@@ -295,41 +320,45 @@ const Dashboard = () => {
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        </div>
+        </motion.div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Transaction Trend (October 2025)</CardTitle>
-            <p className="text-sm text-muted-foreground">Weekly transaction volume by calendar week</p>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyTrend}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis 
-                  dataKey="date" 
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis 
-                  tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}K`}
-                />
-                <Tooltip 
-                  formatter={(value) => [`₹${Number(value).toLocaleString()}`, 'Amount']}
-                  labelFormatter={(label) => `${label} (Oct 2025)`}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="amount" 
-                  stroke="hsl(var(--secondary))" 
-                  strokeWidth={3}
-                  dot={{ fill: 'hsl(var(--secondary))', r: 5 }}
-                  activeDot={{ r: 8 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: 'easeOut', delay: 0.1 } } }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Transaction Trend (October 2025)</CardTitle>
+              <p className="text-sm text-muted-foreground">Weekly transaction volume by calendar week</p>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={monthlyTrend}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis 
+                    tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}K`}
+                  />
+                  <Tooltip 
+                    formatter={(value) => [`₹${Number(value).toLocaleString()}`, 'Amount']}
+                    labelFormatter={(label) => `${label} (Oct 2025)`}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="amount" 
+                    stroke="hsl(var(--secondary))" 
+                    strokeWidth={3}
+                    dot={{ fill: 'hsl(var(--secondary))', r: 5 }}
+                    activeDot={{ r: 8 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
     </DashboardLayout>
   );
 };
