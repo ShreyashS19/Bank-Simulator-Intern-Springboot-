@@ -1,5 +1,6 @@
 package com.bank.simulator.service.impl;
 
+import com.bank.simulator.auth.user.AuthProvider;
 import com.bank.simulator.dto.LoginRequest;
 import com.bank.simulator.dto.LoginResponse;
 import com.bank.simulator.dto.SignupRequest;
@@ -50,6 +51,7 @@ public class UserServiceImpl implements UserService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role("USER")
                 .active(true)
+                .provider(AuthProvider.LOCAL)
                 .build();
 
         UserEntity saved = userRepository.save(user);

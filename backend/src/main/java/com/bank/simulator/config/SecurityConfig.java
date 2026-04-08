@@ -1,9 +1,12 @@
 package com.bank.simulator.config;
 
+import com.bank.simulator.auth.oauth.handler.OAuthFailureHandler;
+import com.bank.simulator.auth.oauth.handler.OAuthSuccessHandler;
 import com.bank.simulator.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -30,7 +33,31 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    @Order(1)
+    public SecurityFilterChain oauth2FilterChain(HttpSecurity http,
+                                                 OAuthSuccessHandler oAuthSuccessHandler,
+                                                 OAuthFailureHandler oAuthFailureHandler) throws Exception {
+        http
+            .securityMatcher("/oauth2/**", "/login/oauth2/**")
+            .csrf(AbstractHttpConfigurer::disable)
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .sessionManagement(session ->
+                    session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                .anyRequest().authenticated()
+            )
+            .oauth2Login(oauth2 -> oauth2
+                .successHandler(oAuthSuccessHandler)
+                .failureHandler(oAuthFailureHandler)
+            );
+
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
+    public SecurityFilterChain apiFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -39,6 +66,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Public auth endpoints
                 .requestMatchers(HttpMethod.POST, "/auth/signup", "/auth/login").permitAll()
+                // Public OAuth helper endpoints
+                .requestMatchers(HttpMethod.GET, "/oauth/providers", "/oauth-success").permitAll()
                 // Swagger/OpenAPI
                 .requestMatchers(
                     "/v3/api-docs/**",

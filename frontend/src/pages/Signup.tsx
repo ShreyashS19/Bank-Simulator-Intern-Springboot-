@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { UserPlus, Loader2 } from "lucide-react";
+import { Chrome, Loader2, UserPlus } from "lucide-react";
 import { authService } from "@/services/authService";
 
 const Signup = () => {
@@ -100,6 +100,20 @@ const Signup = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleContinue = async () => {
+    try {
+      const response = await authService.getOAuthProviders();
+      if (!response.success || !response.data?.googleConfigured) {
+        toast.error(response.data?.configurationMessage || "Google login is not configured on backend.");
+        return;
+      }
+
+      window.location.href = authService.getGoogleOAuthUrl();
+    } catch {
+      toast.error("Unable to verify Google OAuth configuration. Please try again.");
     }
   };
 
@@ -200,6 +214,20 @@ const Signup = () => {
                     Create Account
                   </>
                 )}
+              </Button>
+
+              <div className="relative py-1">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">or</span>
+                </div>
+              </div>
+
+              <Button type="button" variant="outline" className="w-full" disabled={loading} onClick={handleGoogleContinue}>
+                <Chrome className="mr-2 h-4 w-4" />
+                Continue with Google
               </Button>
             </form>
 

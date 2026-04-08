@@ -1,5 +1,6 @@
 package com.bank.simulator.config;
 
+import com.bank.simulator.auth.user.AuthProvider;
 import com.bank.simulator.entity.UserEntity;
 import com.bank.simulator.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class AdminSeeder implements CommandLineRunner {
                     .password(passwordEncoder.encode(adminPassword))
                     .role("ADMIN")
                     .active(true)
+                    .provider(AuthProvider.LOCAL)
                     .build();
 
             userRepository.save(admin);

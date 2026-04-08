@@ -21,3 +21,8 @@ email.password=YOUR_16_CHAR_APP_PASSWORD
 
 
 email.enabled=true
+
+# Google OAuth2 (Spring Security)
+GOOGLE_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
+GOOGLE_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
+APP_OAUTH2_REDIRECT_URI=http://localhost:5173/oauth-success

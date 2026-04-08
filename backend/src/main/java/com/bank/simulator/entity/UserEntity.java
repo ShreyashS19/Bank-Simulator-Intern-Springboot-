@@ -1,5 +1,6 @@
 package com.bank.simulator.entity;
 
+import com.bank.simulator.auth.user.AuthProvider;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -38,6 +39,11 @@ public class UserEntity {
     @Column(nullable = false)
     @Builder.Default
     private boolean active = true;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20, columnDefinition = "varchar(20) default 'LOCAL'")
+    @Builder.Default
+    private AuthProvider provider = AuthProvider.LOCAL;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

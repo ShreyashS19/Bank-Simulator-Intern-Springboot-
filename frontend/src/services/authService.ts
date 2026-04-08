@@ -2,6 +2,8 @@ import axios from 'axios';
 import '../utils/axiosConfig'; // Initialize interceptors
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+const GOOGLE_OAUTH_URL =
+  import.meta.env.VITE_GOOGLE_OAUTH_URL || `${API_BASE_URL}/oauth2/authorization/google`;
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -67,6 +69,17 @@ export interface ApiResponse<T = any> {
   timestamp: string;
 }
 
+export interface OAuthProvidersResponse {
+  success: boolean;
+  message: string;
+  data: {
+    googleAuthorizationPath: string;
+    googleConfigured: boolean;
+    configurationMessage: string;
+  };
+  timestamp: string;
+}
+
 // ─── Token Utilities ─────────────────────────────────────────────────────────
 
 export const tokenUtils = {
@@ -128,6 +141,13 @@ export const tokenUtils = {
 // ─── Auth Service ─────────────────────────────────────────────────────────────
 
 export const authService = {
+  getGoogleOAuthUrl: (): string => GOOGLE_OAUTH_URL,
+
+  getOAuthProviders: async (): Promise<OAuthProvidersResponse> => {
+    const response = await axios.get<OAuthProvidersResponse>(`${API_BASE_URL}/oauth/providers`);
+    return response.data;
+  },
+
   signup: async (request: SignupRequest): Promise<AuthResponse> => {
     const response = await axios.post<AuthResponse>(`${API_BASE_URL}/auth/signup`, request);
     return response.data;
