@@ -10,6 +10,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -28,6 +29,7 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
@@ -74,6 +76,12 @@ public class SecurityConfig {
                     "/swagger-ui/**",
                     "/swagger-ui.html"
                 ).permitAll()
+                // Loan endpoints - Admin only
+                .requestMatchers(HttpMethod.GET, "/loan/all", "/loan/statistics").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/loan/*/status").hasRole("ADMIN")
+                // Loan endpoints - Authenticated users
+                .requestMatchers(HttpMethod.POST, "/loan/apply").authenticated()
+                .requestMatchers(HttpMethod.GET, "/loan/account/**", "/loan/*").authenticated()
                 // All other requests require authentication
                 .anyRequest().authenticated()
             )

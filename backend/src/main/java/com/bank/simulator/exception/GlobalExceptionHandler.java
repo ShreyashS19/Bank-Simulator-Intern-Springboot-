@@ -2,6 +2,7 @@ package com.bank.simulator.exception;
 
 import com.bank.simulator.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.LazyInitializationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -23,6 +24,13 @@ public class GlobalExceptionHandler {
         log.warn("Business exception: {}", ex.getMessage());
         return ResponseEntity.status(ex.getStatus())
                 .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(LazyInitializationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleLazyInitializationException(LazyInitializationException ex) {
+        log.error("Lazy initialization exception: {}", ex.getMessage(), ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Data access error. Please try again."));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

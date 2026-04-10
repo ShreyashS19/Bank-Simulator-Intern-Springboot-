@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,4 +30,11 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
      */
     @Query("SELECT t.transactionId FROM TransactionEntity t WHERE t.transactionId LIKE :prefix% ORDER BY t.transactionId DESC")
     List<String> findLastTransactionIdForDate(@Param("prefix") String prefix, Pageable pageable);
+
+    /**
+     * Find transactions by account number (sender or receiver) and created date after a specific date
+     * Used for transaction pattern analysis in credit scoring
+     */
+    @Query("SELECT t FROM TransactionEntity t WHERE (t.senderAccountNumber = :accountNumber OR t.receiverAccountNumber = :accountNumber) AND t.createdDate >= :afterDate")
+    List<TransactionEntity> findByAccountNumberAndCreatedDateAfter(@Param("accountNumber") String accountNumber, @Param("afterDate") LocalDateTime afterDate);
 }

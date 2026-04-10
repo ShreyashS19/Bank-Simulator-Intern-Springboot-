@@ -41,6 +41,7 @@ import {
   UserX,
   UserCheck,
   Filter,
+  FileText,
 } from 'lucide-react';
 import { customerService, Customer } from '../services/customerService';
 import { accountService, Account } from '../services/accountService';
@@ -340,6 +341,32 @@ const AdminDashboard = () => {
             </Card>
           </motion.div>
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                Loan Management
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Manage loan applications, review eligibility scores, and update loan statuses
+              </p>
+              <Button
+                onClick={() => navigate('/admin/loans')}
+                className="w-full"
+              >
+                Go to Loan Management
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
 
         <Card>
           <CardHeader>

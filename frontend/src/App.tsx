@@ -12,7 +12,10 @@ import Customers from "./pages/Customers";
 import Accounts from "./pages/Accounts";
 import Transactions from "./pages/Transactions";
 import AdminDashboard from "./pages/AdminDashboard";
+import LoanDashboard from "./pages/LoanDashboard";
+import AdminLoanManagement from "./pages/AdminLoanManagement";
 import NotFound from "./pages/NotFound";
+import { LoanApplicationForm } from "./components/LoanApplicationForm";
 
 // ─── Import interceptors to initialize globally ───────────────────────────────
 import './utils/axiosConfig';
@@ -82,6 +85,15 @@ const App = () => (
             }
           />
 
+          <Route
+            path="/admin/loans"
+            element={
+              <AdminRoute>
+                <AdminLoanManagement />
+              </AdminRoute>
+            }
+          />
+
           {/* Protected Routes */}
           <Route
             path="/dashboard"
@@ -115,6 +127,25 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Transactions />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Loan Routes */}
+          <Route
+            path="/loans"
+            element={
+              <ProtectedRoute>
+                <LoanDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/loans/apply"
+            element={
+              <ProtectedRoute>
+                <LoanApplicationForm />
               </ProtectedRoute>
             }
           />

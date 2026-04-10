@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutDashboard, Users, CreditCard, ArrowLeftRight, LogOut, Menu, X, Shield } from "lucide-react";
+import { LayoutDashboard, Users, CreditCard, ArrowLeftRight, LogOut, Menu, X, Shield, FileText, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [expandedItems, setExpandedItems] = useState<string[]>(["/loans"]);
   
   // ✅ Check if user is admin
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
@@ -63,6 +64,14 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     setIsCollapsed(!isCollapsed);
   };
 
+  const toggleExpanded = (path: string) => {
+    setExpandedItems(prev => 
+      prev.includes(path) 
+        ? prev.filter(p => p !== path)
+        : [...prev, path]
+    );
+  };
+
   // ✅ Define all navigation items with admin check
   const allNavItems = [
     { 
@@ -100,6 +109,19 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       label: "Transactions", 
       showAlways: true,
       showForAdmin: true
+    },
+    { 
+      path: "/loans", 
+      icon: FileText, 
+      label: "Loans", 
+      showAlways: true,
+      showForAdmin: true,
+      subItems: [
+        {
+          path: "/loans/apply",
+          label: "Apply for Loan"
+        }
+      ]
     },
   ];
 
@@ -179,34 +201,99 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
+            const hasSubItems = item.subItems && item.subItems.length > 0;
+            const isExpanded = expandedItems.includes(item.path);
+            const isSubItemActive = hasSubItems && item.subItems?.some(sub => location.pathname === sub.path);
+            
             return (
-              <Link key={item.path} to={item.path}>
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                    isActive && "bg-sidebar-accent text-sidebar-accent-foreground",
-                    isCollapsed ? "justify-center px-2" : "justify-start",
-                    // ✅ Highlight admin panel link
-                    item.adminOnly && "border-l-2 border-primary"
-                  )}
-                  title={isCollapsed ? item.label : undefined}
-                >
-                  <Icon className={cn("h-5 w-5", !isCollapsed && "mr-3")} />
-                  <AnimatePresence mode="wait">
-                    {!isCollapsed && (
-                      <motion.span
-                        initial={{ opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: "auto" }}
-                        exit={{ opacity: 0, width: 0 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        {item.label}
-                      </motion.span>
+              <div key={item.path}>
+                {hasSubItems ? (
+                  <Button
+                    variant="ghost"
+                    onClick={() => toggleExpanded(item.path)}
+                    className={cn(
+                      "w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                      (isActive || isSubItemActive) && "bg-sidebar-accent text-sidebar-accent-foreground",
+                      isCollapsed ? "justify-center px-2" : "justify-start",
+                      item.adminOnly && "border-l-2 border-primary"
                     )}
-                  </AnimatePresence>
-                </Button>
-              </Link>
+                    title={isCollapsed ? item.label : undefined}
+                  >
+                    <Icon className={cn("h-5 w-5", !isCollapsed && "mr-3")} />
+                    <AnimatePresence mode="wait">
+                      {!isCollapsed && (
+                        <motion.span
+                          initial={{ opacity: 0, width: 0 }}
+                          animate={{ opacity: 1, width: "auto" }}
+                          exit={{ opacity: 0, width: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="flex-1 text-left"
+                        >
+                          {item.label}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                    {!isCollapsed && (
+                      isExpanded ? <ChevronDown className="h-4 w-4 ml-auto" /> : <ChevronRight className="h-4 w-4 ml-auto" />
+                    )}
+                  </Button>
+                ) : (
+                  <Link to={item.path}>
+                    <Button
+                      variant="ghost"
+                      className={cn(
+                        "w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                        isActive && "bg-sidebar-accent text-sidebar-accent-foreground",
+                        isCollapsed ? "justify-center px-2" : "justify-start",
+                        item.adminOnly && "border-l-2 border-primary"
+                      )}
+                      title={isCollapsed ? item.label : undefined}
+                    >
+                      <Icon className={cn("h-5 w-5", !isCollapsed && "mr-3")} />
+                      <AnimatePresence mode="wait">
+                        {!isCollapsed && (
+                          <motion.span
+                            initial={{ opacity: 0, width: 0 }}
+                            animate={{ opacity: 1, width: "auto" }}
+                            exit={{ opacity: 0, width: 0 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            {item.label}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </Button>
+                  </Link>
+                )}
+                
+                {/* Sub-items */}
+                {hasSubItems && isExpanded && !isCollapsed && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="ml-4 mt-1 space-y-1"
+                  >
+                    {item.subItems?.map((subItem) => {
+                      const isSubActive = location.pathname === subItem.path;
+                      return (
+                        <Link key={subItem.path} to={subItem.path}>
+                          <Button
+                            variant="ghost"
+                            className={cn(
+                              "w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground justify-start text-sm",
+                              isSubActive && "bg-sidebar-accent text-sidebar-accent-foreground"
+                            )}
+                          >
+                            <span className="ml-6">{subItem.label}</span>
+                          </Button>
+                        </Link>
+                      );
+                    })}
+                  </motion.div>
+                )}
+              </div>
             );
           })}
         </nav>
