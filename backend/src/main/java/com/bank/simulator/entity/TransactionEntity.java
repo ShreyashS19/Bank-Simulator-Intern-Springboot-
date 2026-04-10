@@ -45,6 +45,10 @@ public class TransactionEntity {
     @Builder.Default
     private String transactionType = "ONLINE";
 
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private String status = "SUCCESS";
+
     @Column(columnDefinition = "TEXT")
     private String description;
 

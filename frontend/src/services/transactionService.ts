@@ -21,6 +21,14 @@ export interface ApiResponse<T> {
   timestamp: string;
 }
 
+interface PageResponse<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
 export const transactionService = {
   getTransactionsByAccount: async (accountNumber: string): Promise<Transaction[]> => {
     try {
@@ -63,9 +71,11 @@ export const transactionService = {
   getAllTransactions: async (): Promise<Transaction[]> => {
     try {
       console.log(' Fetching all transactions');
-      const response = await axios.get<ApiResponse<Transaction[]>>(`${API_BASE_URL}/transaction/all`);
-      console.log(' Transactions fetched:', response.data.data.length);
-      return response.data.data;
+      const response = await axios.get<ApiResponse<Transaction[] | PageResponse<Transaction>>>(`${API_BASE_URL}/transaction/all`);
+      const data = response.data.data;
+      const transactions = Array.isArray(data) ? data : data.content;
+      console.log(' Transactions fetched:', transactions.length);
+      return transactions;
     } catch (error: any) {
       console.error(' Error fetching all transactions:', error);
       return [];

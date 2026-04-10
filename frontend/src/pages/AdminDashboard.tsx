@@ -161,12 +161,12 @@ const AdminDashboard = () => {
 
   const toggleCustomerStatus = async (customer: Customer) => {
     try {
-      const newStatus = customer.status.toLowerCase() === 'active' ? 'Inactive' : 'Active';
+      const newStatus = customer.status.toUpperCase() === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
       await customerService.updateCustomerByAadhar(customer.aadharNumber, {
         ...customer,
         status: newStatus,
       });
-      toast.success(`Customer ${newStatus === 'Active' ? 'activated' : 'deactivated'}`);
+      toast.success(`Customer ${newStatus === 'ACTIVE' ? 'activated' : 'deactivated'}`);
       loadAllData();
     } catch (error: any) {
       toast.error('Failed to update customer status');

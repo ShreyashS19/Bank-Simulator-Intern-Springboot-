@@ -1,5 +1,9 @@
 package com.bank.simulator.service.impl;
 
+import com.bank.simulator.dto.AccountResponse;
+import com.bank.simulator.dto.CreateAccountRequest;
+import com.bank.simulator.dto.PageResponse;
+import com.bank.simulator.dto.UpdateAccountRequest;
 import com.bank.simulator.entity.AccountEntity;
 import com.bank.simulator.entity.CustomerEntity;
 import com.bank.simulator.exception.BusinessException;
@@ -8,13 +12,14 @@ import com.bank.simulator.repository.CustomerRepository;
 import com.bank.simulator.service.AccountService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -26,20 +31,19 @@ public class AccountServiceImpl implements AccountService {
 
     @Override
     @Transactional
-    public String createAccount(Map<String, Object> payload) {
-        String accountNumber = getStr(payload, "accountNumber");
-        String aadharNumber = getStr(payload, "aadharNumber");
-        String ifscCode = getStr(payload, "ifscCode");
-        String bankName = getStr(payload, "bankName");
-        String nameOnAccount = getStr(payload, "nameOnAccount");
-        String status = payload.containsKey("status") ? getStr(payload, "status") : "ACTIVE";
+    public String createAccount(CreateAccountRequest payload) {
+        String accountNumber = safeTrim(payload.getAccountNumber());
+        String aadharNumber = safeTrim(payload.getAadharNumber());
+        String ifscCode = safeTrim(payload.getIfscCode());
+        String bankName = safeTrim(payload.getBankName());
+        String nameOnAccount = safeTrim(payload.getNameOnAccount());
+        String status = safeTrim(payload.getStatus());
 
-        BigDecimal amount;
-        try {
-            amount = new BigDecimal(payload.getOrDefault("amount", "600.00").toString());
-        } catch (Exception e) {
-            amount = BigDecimal.valueOf(600.00);
+        if (status == null || status.isBlank()) {
+            status = "ACTIVE";
         }
+
+        BigDecimal amount = payload.getAmount() != null ? payload.getAmount() : BigDecimal.valueOf(600.00);
 
         // Validations
         if (accountNumber == null || accountNumber.isBlank()) throw new BusinessException("Account number is required");
@@ -79,26 +83,44 @@ public class AccountServiceImpl implements AccountService {
     }
 
     @Override
-    public AccountEntity getAccountByNumber(String accountNumber) {
-        return accountRepository.findByAccountNumber(accountNumber)
+    public AccountResponse getAccountByNumber(String accountNumber) {
+        AccountEntity account = accountRepository.findByAccountNumberWithCustomer(accountNumber)
                 .orElseThrow(() -> new BusinessException(
                     "Account not found with number: " + accountNumber, HttpStatus.NOT_FOUND));
+
+        return toResponse(account);
     }
 
     @Override
-    public List<AccountEntity> getAllAccounts() {
-        return accountRepository.findAllByOrderByCreatedDesc();
+    public PageResponse<AccountResponse> getAllAccounts(int page, int size) {
+        int normalizedPage = Math.max(page, 0);
+        int normalizedSize = size > 0 ? size : 20;
+
+        Page<AccountEntity> accountPage = accountRepository.findAllWithCustomer(PageRequest.of(normalizedPage, normalizedSize));
+
+        List<AccountResponse> content = accountPage
+                .getContent().stream()
+                .map(this::toResponse)
+                .toList();
+
+        return PageResponse.<AccountResponse>builder()
+                .content(content)
+                .page(accountPage.getNumber())
+                .size(accountPage.getSize())
+                .totalElements(accountPage.getTotalElements())
+                .totalPages(accountPage.getTotalPages())
+                .build();
     }
 
     @Override
     @Transactional
-    public void updateAccountByNumber(String accountNumber, Map<String, Object> payload) {
+    public void updateAccountByNumber(String accountNumber, UpdateAccountRequest payload) {
         AccountEntity account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new BusinessException(
                     "Account not found with number: " + accountNumber, HttpStatus.NOT_FOUND));
 
-        if (payload.containsKey("accountNumber")) {
-            String newAccountNumber = getStr(payload, "accountNumber");
+        String newAccountNumber = safeTrim(payload.getAccountNumber());
+        if (newAccountNumber != null && !newAccountNumber.isBlank()) {
             if (!newAccountNumber.equals(accountNumber) && accountRepository.existsByAccountNumber(newAccountNumber)) {
                 throw new BusinessException("Account number already exists");
             }
@@ -106,8 +128,8 @@ public class AccountServiceImpl implements AccountService {
         }
 
         // Re-link customer if aadhar changes
-        if (payload.containsKey("aadharNumber")) {
-            String newAadhar = getStr(payload, "aadharNumber");
+        String newAadhar = safeTrim(payload.getAadharNumber());
+        if (newAadhar != null && !newAadhar.isBlank()) {
             if (!newAadhar.equals(account.getAadharNumber())) {
                 CustomerEntity customer = customerRepository.findByAadharNumber(newAadhar)
                         .orElseThrow(() -> new BusinessException("No customer found for Aadhar: " + newAadhar));
@@ -117,16 +139,28 @@ public class AccountServiceImpl implements AccountService {
             }
         }
 
-        if (payload.containsKey("ifscCode")) account.setIfscCode(getStr(payload, "ifscCode"));
-        if (payload.containsKey("bankName")) account.setBankName(getStr(payload, "bankName"));
-        if (payload.containsKey("nameOnAccount")) account.setNameOnAccount(getStr(payload, "nameOnAccount"));
-        if (payload.containsKey("status")) account.setStatus(getStr(payload, "status"));
-        if (payload.containsKey("amount")) {
-            try {
-                account.setAmount(new BigDecimal(payload.get("amount").toString()));
-            } catch (Exception e) {
-                throw new BusinessException("Invalid amount value");
-            }
+        String ifscCode = safeTrim(payload.getIfscCode());
+        if (ifscCode != null && !ifscCode.isBlank()) {
+            account.setIfscCode(ifscCode);
+        }
+
+        String bankName = safeTrim(payload.getBankName());
+        if (bankName != null && !bankName.isBlank()) {
+            account.setBankName(bankName);
+        }
+
+        String nameOnAccount = safeTrim(payload.getNameOnAccount());
+        if (nameOnAccount != null && !nameOnAccount.isBlank()) {
+            account.setNameOnAccount(nameOnAccount);
+        }
+
+        String status = safeTrim(payload.getStatus());
+        if (status != null && !status.isBlank()) {
+            account.setStatus(status);
+        }
+
+        if (payload.getAmount() != null) {
+            account.setAmount(payload.getAmount());
         }
 
         accountRepository.save(account);
@@ -143,8 +177,24 @@ public class AccountServiceImpl implements AccountService {
         log.info("Account deleted: accountNumber={}", accountNumber);
     }
 
-    private String getStr(Map<String, Object> map, String key) {
-        Object val = map.get(key);
-        return val != null ? val.toString().trim() : null;
+    private String safeTrim(String value) {
+        return value != null ? value.trim() : null;
+    }
+
+    private AccountResponse toResponse(AccountEntity account) {
+        return AccountResponse.builder()
+                .accountId(String.valueOf(account.getId()))
+                .customerId(account.getCustomer() != null ? String.valueOf(account.getCustomer().getId()) : null)
+                .accountNumber(account.getAccountNumber())
+                .aadharNumber(account.getAadharNumber())
+                .ifscCode(account.getIfscCode())
+                .phoneNumberLinked(account.getPhoneNumberLinked())
+                .amount(account.getAmount())
+                .bankName(account.getBankName())
+                .nameOnAccount(account.getNameOnAccount())
+                .status(account.getStatus())
+                .created(account.getCreated())
+                .modified(account.getModified())
+                .build();
     }
 }

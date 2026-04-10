@@ -24,13 +24,23 @@ export interface ApiResponse<T> {
   timestamp: string;
 }
 
+interface PageResponse<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
 export const accountService = {
   getAllAccounts: async (): Promise<Account[]> => {
     try {
       console.log(' Fetching all accounts');
-      const response = await axios.get<ApiResponse<Account[]>>(`${API_BASE_URL}/account/all`);
-      console.log(' Accounts fetched:', response.data.data.length);
-      return response.data.data;
+      const response = await axios.get<ApiResponse<Account[] | PageResponse<Account>>>(`${API_BASE_URL}/account/all`);
+      const data = response.data.data;
+      const accounts = Array.isArray(data) ? data : data.content;
+      console.log(' Accounts fetched:', accounts.length);
+      return accounts;
     } catch (error: any) {
       console.error(' Error fetching accounts:', error);
       throw error;

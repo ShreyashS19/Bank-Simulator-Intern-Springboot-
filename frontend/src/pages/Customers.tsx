@@ -30,7 +30,7 @@ const Customers = () => {
     customerPin: "",
     aadharNumber: "",
     dob: "",
-    status: "Active"
+    status: "ACTIVE"
   });
 
   const handleSearch = async () => {
@@ -231,7 +231,7 @@ const handleEdit = async (customer: Customer) => {
       customerPin: "",
       aadharNumber: "",
       dob: "",
-      status: "Active"
+      status: "ACTIVE"
     });
   };
 
@@ -359,8 +359,8 @@ const handleEdit = async (customer: Customer) => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {/* <SelectItem value="Inactive">Inactive</SelectItem> */}
-                      <SelectItem value="Active">Active</SelectItem>
+                      {/* <SelectItem value="INACTIVE">Inactive</SelectItem> */}
+                      <SelectItem value="ACTIVE">Active</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

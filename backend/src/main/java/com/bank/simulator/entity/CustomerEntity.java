@@ -37,7 +37,7 @@ public class CustomerEntity {
     private String address;
 
     @JsonIgnore
-    @Column(name = "customer_pin", nullable = false, length = 6)
+    @Column(name = "customer_pin", nullable = false, length = 255)
     private String customerPin;
 
     @Column(name = "aadhar_number", nullable = false, unique = true, length = 12)
@@ -48,7 +48,7 @@ public class CustomerEntity {
 
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private String status = "Inactive";
+    private String status = "INACTIVE";
 
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore

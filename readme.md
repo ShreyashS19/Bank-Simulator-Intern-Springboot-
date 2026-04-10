@@ -1,6 +1,6 @@
 # 🏦 Banking Activity Simulation Platform
 
-A **full-stack banking management system** that replicates real-world banking workflows — from user authentication to transaction management — built using **Java (Jersey + MySQL)** and **React (Vite + TypeScript + Tailwind)**.
+A **full-stack banking management system** that replicates real-world banking workflows — from user authentication to transaction management — built using **Spring Boot + MySQL** and **React (Vite + TypeScript + Tailwind)**.
 
 > 🚀 Developed as part of the **Banking Activity Simulation Internship (Oct 2025)**  
 > by **Shreyash Shinde**
@@ -38,6 +38,7 @@ A **full-stack banking management system** that replicates real-world banking wo
 - Added strict validators for Customer, Account, and Transaction entities.  
 - Ensures valid Aadhar (12 digits), phone number, and 6-digit PIN.  
 - Centralized and reusable error handling using `ApiResponse.java`.
+- Customer PINs are now stored as BCrypt hashes. Existing plaintext PIN records must be reset or migrated before secure validation can be enforced consistently.
 
 ### 🧑‍💻 Developer Experience
 - Cleaner code organization and improved logs for debugging.  
@@ -49,13 +50,14 @@ A **full-stack banking management system** that replicates real-world banking wo
 ## 🧩 Tech Stack
 
 ### **Backend**
-- **Language:** Java 22  
-- **Framework:** Jersey (Jakarta RESTful Web Services 3.1.3)  
+- **Language:** Java 17  
+- **Framework:** Spring Boot 3.3.5 (Spring Web, Spring Security)  
+- **Data Access:** Spring Data JPA  
 - **Database:** MySQL  
 - **Build Tool:** Maven  
 - **Testing:** JUnit 5, Mockito  
 - **Excel Export:** Apache POI  
-- **Mailing:** Jakarta Mail (Gmail SMTP)  
+- **Mailing:** Spring Mail (Gmail SMTP)  
 
 ### **Frontend**
 - **Framework:** React (Vite + TypeScript)  
@@ -99,7 +101,7 @@ shreyashs19-bank-simulator-intern/
 ## ⚙️ Backend Setup
 
 ### **Requirements**
-- Java 22+
+- Java 17+
 - Maven 3.9+
 - MySQL (port 3306)
 - Gmail account for mail notifications
@@ -108,7 +110,7 @@ shreyashs19-bank-simulator-intern/
 ```bash
 cd backend
 mvn clean package
-mvn jetty:run
+mvn spring-boot:run
 ```
 
 ✅ Auto creates database `bank_simulation` and required tables.  
@@ -209,7 +211,7 @@ Includes:
 ## 📜 License
 
 This project is licensed under the [MIT License](./LICENSE.txt).  
-© 2025 **Shreyash Shinde** — All rights reserved.
+© 2026 **Shreyash Shinde** — All rights reserved.
 
 ---
 

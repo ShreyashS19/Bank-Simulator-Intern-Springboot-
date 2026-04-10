@@ -1,16 +1,17 @@
 package com.bank.simulator.controller;
 
 import com.bank.simulator.dto.ApiResponse;
-import com.bank.simulator.entity.CustomerEntity;
+import com.bank.simulator.dto.CreateCustomerRequest;
+import com.bank.simulator.dto.CustomerResponse;
+import com.bank.simulator.dto.PageResponse;
+import com.bank.simulator.dto.UpdateCustomerRequest;
 import com.bank.simulator.service.CustomerService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/customer")
@@ -25,7 +26,7 @@ public class CustomerController {
      * Onboard a new customer.
      */
     @PostMapping("/onboard")
-    public ResponseEntity<ApiResponse<String>> onboardCustomer(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<ApiResponse<String>> onboardCustomer(@Valid @RequestBody CreateCustomerRequest payload) {
         String result = customerService.createCustomer(payload);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Customer onboarded successfully", result));
@@ -36,8 +37,10 @@ public class CustomerController {
      * Get all customers.
      */
     @GetMapping("/all")
-    public ResponseEntity<ApiResponse<List<CustomerEntity>>> getAllCustomers() {
-        List<CustomerEntity> customers = customerService.getAllCustomers();
+    public ResponseEntity<ApiResponse<PageResponse<CustomerResponse>>> getAllCustomers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        PageResponse<CustomerResponse> customers = customerService.getAllCustomers(page, size);
         return ResponseEntity.ok(ApiResponse.success("Customers retrieved successfully", customers));
     }
 
@@ -46,8 +49,8 @@ public class CustomerController {
      * Get customer by Aadhar number.
      */
     @GetMapping("/aadhar/{aadharNumber}")
-    public ResponseEntity<ApiResponse<CustomerEntity>> getCustomerByAadhar(@PathVariable String aadharNumber) {
-        CustomerEntity customer = customerService.getCustomerByAadhar(aadharNumber);
+    public ResponseEntity<ApiResponse<CustomerResponse>> getCustomerByAadhar(@PathVariable String aadharNumber) {
+        CustomerResponse customer = customerService.getCustomerByAadhar(aadharNumber);
         return ResponseEntity.ok(ApiResponse.success("Customer retrieved successfully", customer));
     }
 
@@ -58,7 +61,7 @@ public class CustomerController {
     @PutMapping("/aadhar/{aadharNumber}")
     public ResponseEntity<ApiResponse<Void>> updateCustomer(
             @PathVariable String aadharNumber,
-            @RequestBody Map<String, Object> payload) {
+            @Valid @RequestBody UpdateCustomerRequest payload) {
         customerService.updateCustomerByAadhar(aadharNumber, payload);
         return ResponseEntity.ok(ApiResponse.success("Customer updated successfully"));
     }

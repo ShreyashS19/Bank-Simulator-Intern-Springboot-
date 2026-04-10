@@ -123,8 +123,8 @@ export const CustomerEditModal = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Active">Active</SelectItem>
-                  {/* <SelectItem value="Inactive">Inactive</SelectItem> */}
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  {/* <SelectItem value="INACTIVE">Inactive</SelectItem> */}
                 </SelectContent>
               </Select>
             </div>

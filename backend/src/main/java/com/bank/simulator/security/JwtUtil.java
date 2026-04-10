@@ -3,12 +3,12 @@ package com.bank.simulator.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import io.jsonwebtoken.io.Decoders;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -57,6 +57,17 @@ public class JwtUtil {
     }
 
     /**
+     * Validate token signature and expiry without a database lookup.
+     */
+    public boolean isTokenValid(String token) {
+        try {
+            return !isTokenExpired(token);
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    /**
      * Validate the token against user details and expiry.
      */
     public boolean validateToken(String token, UserDetails userDetails) {
@@ -86,9 +97,9 @@ public class JwtUtil {
     }
 
     private SecretKey getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(
-                java.util.Base64.getEncoder().encodeToString(jwtSecret.getBytes())
-        );
+        // app.jwt.secret is configured as plain text in properties for this project,
+        // so we must derive the HMAC key directly from UTF-8 bytes without Base64 decode.
+        byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 }

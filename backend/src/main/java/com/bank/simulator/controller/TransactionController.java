@@ -1,9 +1,13 @@
 package com.bank.simulator.controller;
 
 import com.bank.simulator.dto.ApiResponse;
+import com.bank.simulator.dto.CreateTransactionRequest;
+import com.bank.simulator.dto.PageResponse;
+import com.bank.simulator.dto.TransactionResponse;
 import com.bank.simulator.entity.TransactionEntity;
 import com.bank.simulator.service.ExcelGeneratorService;
 import com.bank.simulator.service.TransactionService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ContentDisposition;
@@ -16,7 +20,6 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/transaction")
@@ -33,7 +36,7 @@ public class TransactionController {
      * Validates PIN, active status, balance, and self-transfer.
      */
     @PostMapping("/createTransaction")
-    public ResponseEntity<ApiResponse<String>> createTransaction(@RequestBody Map<String, Object> payload) {
+        public ResponseEntity<ApiResponse<String>> createTransaction(@Valid @RequestBody CreateTransactionRequest payload) {
         String transactionId = transactionService.createTransaction(payload);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Transaction completed successfully", transactionId));
@@ -44,11 +47,10 @@ public class TransactionController {
      * Get all transactions for a specific account number (both sent and received).
      */
     @GetMapping("/getTransactionsByAccountNumber/{accountNumber}")
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getTransactionsByAccount(
+        public ResponseEntity<ApiResponse<List<TransactionResponse>>> getTransactionsByAccount(
             @PathVariable String accountNumber) {
-        List<TransactionEntity> transactions = transactionService.getTransactionsByAccount(accountNumber);
-        return ResponseEntity.ok(ApiResponse.success("Transactions retrieved successfully",
-                transactions.stream().map(this::toTransactionMap).toList()));
+                List<TransactionResponse> transactions = transactionService.getTransactionsByAccount(accountNumber);
+                return ResponseEntity.ok(ApiResponse.success("Transactions retrieved successfully", transactions));
     }
 
     /**
@@ -56,10 +58,11 @@ public class TransactionController {
      * Get all transactions (admin use).
      */
     @GetMapping("/all")
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAllTransactions() {
-        List<TransactionEntity> transactions = transactionService.getAllTransactions();
-        return ResponseEntity.ok(ApiResponse.success("All transactions retrieved",
-                transactions.stream().map(this::toTransactionMap).toList()));
+        public ResponseEntity<ApiResponse<PageResponse<TransactionResponse>>> getAllTransactions(
+                        @RequestParam(defaultValue = "0") int page,
+                        @RequestParam(defaultValue = "20") int size) {
+                PageResponse<TransactionResponse> transactions = transactionService.getAllTransactions(page, size);
+                return ResponseEntity.ok(ApiResponse.success("All transactions retrieved", transactions));
     }
 
     /**
@@ -68,7 +71,7 @@ public class TransactionController {
      */
     @GetMapping("/download/{accountNumber}")
     public ResponseEntity<byte[]> downloadTransactionsByAccount(@PathVariable String accountNumber) {
-        List<TransactionEntity> transactions = transactionService.getTransactionsByAccount(accountNumber);
+        List<TransactionEntity> transactions = transactionService.getTransactionsByAccountForExport(accountNumber);
         String title = "Transaction History — Account: " + accountNumber;
         byte[] excelBytes = excelGeneratorService.generateTransactionExcel(transactions, title);
 
@@ -95,7 +98,7 @@ public class TransactionController {
      */
     @GetMapping("/download/all")
     public ResponseEntity<byte[]> downloadAllTransactions() {
-        List<TransactionEntity> transactions = transactionService.getAllTransactions();
+        List<TransactionEntity> transactions = transactionService.getAllTransactionsForExport();
         String title = "All Transactions — Bank Simulator Report";
         byte[] excelBytes = excelGeneratorService.generateTransactionExcel(transactions, title);
 
@@ -122,22 +125,5 @@ public class TransactionController {
     public ResponseEntity<ApiResponse<Void>> deleteTransaction(@PathVariable String transactionId) {
         transactionService.deleteTransaction(transactionId);
         return ResponseEntity.ok(ApiResponse.success("Transaction deleted successfully"));
-    }
-
-    /**
-     * Maps TransactionEntity to a Map matching the frontend Transaction interface.
-     */
-    private Map<String, Object> toTransactionMap(TransactionEntity t) {
-        return Map.ofEntries(
-            Map.entry("transactionId", t.getTransactionId() != null ? t.getTransactionId() : ""),
-            Map.entry("senderAccountNumber", t.getSenderAccountNumber()),
-            Map.entry("receiverAccountNumber", t.getReceiverAccountNumber()),
-            Map.entry("amount", t.getAmount()),
-            Map.entry("transactionType", t.getTransactionType() != null ? t.getTransactionType() : "ONLINE"),
-            Map.entry("description", t.getDescription() != null ? t.getDescription() : ""),
-            Map.entry("createdDate", t.getCreatedDate() != null ? t.getCreatedDate().toString() : ""),
-            Map.entry("timestamp", t.getCreatedDate() != null ? t.getCreatedDate().toString() : ""),
-            Map.entry("pin", "")
-        );
     }
 }

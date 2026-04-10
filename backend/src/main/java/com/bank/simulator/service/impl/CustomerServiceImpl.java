@@ -1,19 +1,24 @@
 package com.bank.simulator.service.impl;
 
+import com.bank.simulator.dto.CreateCustomerRequest;
+import com.bank.simulator.dto.CustomerResponse;
+import com.bank.simulator.dto.PageResponse;
+import com.bank.simulator.dto.UpdateCustomerRequest;
 import com.bank.simulator.entity.CustomerEntity;
 import com.bank.simulator.exception.BusinessException;
 import com.bank.simulator.repository.CustomerRepository;
 import com.bank.simulator.service.CustomerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -21,21 +26,24 @@ import java.util.Map;
 public class CustomerServiceImpl implements CustomerService {
 
     private final CustomerRepository customerRepository;
-
-    private static final DateTimeFormatter DOB_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
-    public String createCustomer(Map<String, Object> payload) {
-        // Extract fields from payload
-        String name = getStringField(payload, "name");
-        String phoneNumber = getStringField(payload, "phoneNumber");
-        String email = getStringField(payload, "email");
-        String address = getStringField(payload, "address");
-        String customerPin = getStringField(payload, "customerPin");
-        String aadharNumber = getStringField(payload, "aadharNumber");
-        String dobStr = getStringField(payload, "dob");
-        String status = payload.containsKey("status") ? getStringField(payload, "status") : "Inactive";
+    public String createCustomer(CreateCustomerRequest payload) {
+        String name = safeTrim(payload.getName());
+        String phoneNumber = safeTrim(payload.getPhoneNumber());
+        String email = safeTrim(payload.getEmail());
+        String address = safeTrim(payload.getAddress());
+        String customerPin = safeTrim(payload.getCustomerPin());
+        String aadharNumber = safeTrim(payload.getAadharNumber());
+        LocalDate dob = payload.getDob();
+        String status = safeTrim(payload.getStatus());
+
+        if (status == null || status.isBlank()) {
+            status = "INACTIVE";
+        }
+        status = normalizeCustomerStatus(status);
 
         // Validations
         if (name == null || name.isBlank()) throw new BusinessException("Name is required");
@@ -44,7 +52,7 @@ public class CustomerServiceImpl implements CustomerService {
         if (address == null || address.isBlank()) throw new BusinessException("Address is required");
         if (customerPin == null || !customerPin.matches("\\d{6}")) throw new BusinessException("Customer PIN must be exactly 6 digits");
         if (aadharNumber == null || !aadharNumber.matches("\\d{12}")) throw new BusinessException("Aadhar number must be exactly 12 digits");
-        if (dobStr == null || dobStr.isBlank()) throw new BusinessException("Date of birth is required");
+        if (dob == null) throw new BusinessException("Date of birth is required");
 
         // Uniqueness checks
         if (customerRepository.existsByAadharNumber(aadharNumber)) {
@@ -54,19 +62,12 @@ public class CustomerServiceImpl implements CustomerService {
             throw new BusinessException("A customer with this phone number already exists");
         }
 
-        LocalDate dob;
-        try {
-            dob = LocalDate.parse(dobStr, DOB_FORMATTER);
-        } catch (Exception e) {
-            throw new BusinessException("Invalid date of birth format. Use yyyy-MM-dd");
-        }
-
         CustomerEntity customer = CustomerEntity.builder()
                 .name(name)
                 .phoneNumber(phoneNumber)
                 .email(email)
                 .address(address)
-                .customerPin(customerPin)
+                .customerPin(passwordEncoder.encode(customerPin))
                 .aadharNumber(aadharNumber)
                 .dob(dob)
                 .status(status)
@@ -78,29 +79,49 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
-    public CustomerEntity getCustomerByAadhar(String aadharNumber) {
-        return customerRepository.findByAadharNumber(aadharNumber)
-                .orElseThrow(() -> new BusinessException(
-                    "Customer not found with Aadhar: " + aadharNumber, HttpStatus.NOT_FOUND));
-    }
-
-    @Override
-    public List<CustomerEntity> getAllCustomers() {
-        return customerRepository.findAll();
-    }
-
-    @Override
-    @Transactional
-    public void updateCustomerByAadhar(String aadharNumber, Map<String, Object> payload) {
+    public CustomerResponse getCustomerByAadhar(String aadharNumber) {
         CustomerEntity customer = customerRepository.findByAadharNumber(aadharNumber)
                 .orElseThrow(() -> new BusinessException(
                     "Customer not found with Aadhar: " + aadharNumber, HttpStatus.NOT_FOUND));
 
-        if (payload.containsKey("name") && !getStringField(payload, "name").isBlank()) {
-            customer.setName(getStringField(payload, "name"));
+        return toResponse(customer);
+    }
+
+    @Override
+    public PageResponse<CustomerResponse> getAllCustomers(int page, int size) {
+        int normalizedPage = Math.max(page, 0);
+        int normalizedSize = size > 0 ? size : 20;
+
+        Page<CustomerEntity> customerPage = customerRepository.findAll(PageRequest.of(normalizedPage, normalizedSize));
+
+        List<CustomerResponse> content = customerPage
+                .getContent().stream()
+                .map(this::toResponse)
+                .toList();
+
+        return PageResponse.<CustomerResponse>builder()
+                .content(content)
+                .page(customerPage.getNumber())
+                .size(customerPage.getSize())
+                .totalElements(customerPage.getTotalElements())
+                .totalPages(customerPage.getTotalPages())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void updateCustomerByAadhar(String aadharNumber, UpdateCustomerRequest payload) {
+        CustomerEntity customer = customerRepository.findByAadharNumber(aadharNumber)
+                .orElseThrow(() -> new BusinessException(
+                    "Customer not found with Aadhar: " + aadharNumber, HttpStatus.NOT_FOUND));
+
+        String name = safeTrim(payload.getName());
+        if (name != null && !name.isBlank()) {
+            customer.setName(name);
         }
-        if (payload.containsKey("phoneNumber")) {
-            String phone = getStringField(payload, "phoneNumber");
+
+        String phone = safeTrim(payload.getPhoneNumber());
+        if (phone != null) {
             if (!phone.matches("\\d{10}")) throw new BusinessException("Phone number must be exactly 10 digits");
             // Check uniqueness if changed
             if (!phone.equals(customer.getPhoneNumber()) && customerRepository.existsByPhoneNumber(phone)) {
@@ -108,33 +129,38 @@ public class CustomerServiceImpl implements CustomerService {
             }
             customer.setPhoneNumber(phone);
         }
-        if (payload.containsKey("email")) {
-            customer.setEmail(getStringField(payload, "email"));
+
+        if (payload.getEmail() != null) {
+            customer.setEmail(safeTrim(payload.getEmail()));
         }
-        if (payload.containsKey("address")) {
-            customer.setAddress(getStringField(payload, "address"));
+
+        if (payload.getAddress() != null) {
+            customer.setAddress(safeTrim(payload.getAddress()));
         }
-        if (payload.containsKey("customerPin")) {
-            String pin = getStringField(payload, "customerPin");
+
+        String pin = safeTrim(payload.getCustomerPin());
+        if (pin != null) {
             if (!pin.matches("\\d{6}")) throw new BusinessException("Customer PIN must be exactly 6 digits");
-            customer.setCustomerPin(pin);
+            customer.setCustomerPin(passwordEncoder.encode(pin));
         }
-        if (payload.containsKey("aadharNumber")) {
-            String newAadhar = getStringField(payload, "aadharNumber");
+
+        String newAadhar = safeTrim(payload.getAadharNumber());
+        if (newAadhar != null) {
+            if (!newAadhar.matches("\\d{12}")) {
+                throw new BusinessException("Aadhar number must be exactly 12 digits");
+            }
             if (!newAadhar.equals(aadharNumber) && customerRepository.existsByAadharNumber(newAadhar)) {
                 throw new BusinessException("A customer with this Aadhar number already exists");
             }
             customer.setAadharNumber(newAadhar);
         }
-        if (payload.containsKey("dob")) {
-            try {
-                customer.setDob(LocalDate.parse(getStringField(payload, "dob"), DOB_FORMATTER));
-            } catch (Exception e) {
-                throw new BusinessException("Invalid date of birth format. Use yyyy-MM-dd");
-            }
+
+        if (payload.getDob() != null) {
+            customer.setDob(payload.getDob());
         }
-        if (payload.containsKey("status")) {
-            customer.setStatus(getStringField(payload, "status"));
+
+        if (payload.getStatus() != null) {
+            customer.setStatus(normalizeCustomerStatus(safeTrim(payload.getStatus())));
         }
 
         customerRepository.save(customer);
@@ -151,8 +177,33 @@ public class CustomerServiceImpl implements CustomerService {
         log.info("Customer deleted: aadhar={}", aadharNumber);
     }
 
-    private String getStringField(Map<String, Object> map, String key) {
-        Object val = map.get(key);
-        return val != null ? val.toString().trim() : null;
+    private String safeTrim(String value) {
+        return value != null ? value.trim() : null;
+    }
+
+    private String normalizeCustomerStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return "INACTIVE";
+        }
+
+        String normalized = status.trim().toUpperCase();
+        if (!"ACTIVE".equals(normalized) && !"INACTIVE".equals(normalized)) {
+            throw new BusinessException("Status must be either ACTIVE or INACTIVE");
+        }
+
+        return normalized;
+    }
+
+    private CustomerResponse toResponse(CustomerEntity customer) {
+        return CustomerResponse.builder()
+                .customerId(String.valueOf(customer.getId()))
+                .name(customer.getName())
+                .phoneNumber(customer.getPhoneNumber())
+                .email(customer.getEmail())
+                .address(customer.getAddress())
+                .aadharNumber(customer.getAadharNumber())
+                .dob(customer.getDob())
+                .status(customer.getStatus())
+                .build();
     }
 }

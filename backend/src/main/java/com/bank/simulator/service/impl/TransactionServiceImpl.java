@@ -1,5 +1,8 @@
 package com.bank.simulator.service.impl;
 
+import com.bank.simulator.dto.CreateTransactionRequest;
+import com.bank.simulator.dto.PageResponse;
+import com.bank.simulator.dto.TransactionResponse;
 import com.bank.simulator.entity.AccountEntity;
 import com.bank.simulator.entity.CustomerEntity;
 import com.bank.simulator.entity.TransactionEntity;
@@ -10,8 +13,10 @@ import com.bank.simulator.service.NotificationService;
 import com.bank.simulator.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -21,7 +26,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -31,26 +35,25 @@ public class TransactionServiceImpl implements TransactionService {
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
     private final NotificationService notificationService;
+    private final PasswordEncoder passwordEncoder;
 
     private static final DateTimeFormatter TXN_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final Object TXN_ID_LOCK = new Object();
 
     @Override
     @Transactional
-    public String createTransaction(Map<String, Object> payload) {
+    public String createTransaction(CreateTransactionRequest payload) {
 
         // --- Extract & validate input ---
-        String senderAccountNumber = getStr(payload, "senderAccountNumber");
-        String receiverAccountNumber = getStr(payload, "receiverAccountNumber");
-        String pin = getStr(payload, "pin");
-        String description = getStr(payload, "description");
-        String transactionType = payload.containsKey("transactionType") ? getStr(payload, "transactionType") : "ONLINE";
+        String senderAccountNumber = safeTrim(payload.getSenderAccountNumber());
+        String receiverAccountNumber = safeTrim(payload.getReceiverAccountNumber());
+        String pin = safeTrim(payload.getPin());
+        String description = safeTrim(payload.getDescription());
+        String transactionType = safeTrim(payload.getTransactionType());
+        BigDecimal amount = payload.getAmount();
 
-        BigDecimal amount;
-        try {
-            amount = new BigDecimal(payload.get("amount").toString());
-        } catch (Exception e) {
-            throw new BusinessException("Invalid amount value");
+        if (transactionType == null || transactionType.isBlank()) {
+            transactionType = "ONLINE";
         }
 
         if (senderAccountNumber == null || senderAccountNumber.isBlank())
@@ -83,8 +86,17 @@ public class TransactionServiceImpl implements TransactionService {
         }
 
         // --- Rule 3: PIN validation ---
-        if (!pin.equals(senderCustomer.getCustomerPin())) {
+        String storedPin = senderCustomer.getCustomerPin();
+        boolean hashedMatch = passwordEncoder.matches(pin, storedPin);
+        boolean legacyPlaintextMatch = pin.equals(storedPin);
+
+        if (!hashedMatch && !legacyPlaintextMatch) {
             throw new BusinessException("Invalid transaction PIN. Please check your PIN and try again.");
+        }
+
+        if (legacyPlaintextMatch) {
+            senderCustomer.setCustomerPin(passwordEncoder.encode(pin));
+            log.info("Legacy plaintext PIN upgraded to hash for customer aadhar={}", senderCustomer.getAadharNumber());
         }
 
         // --- Fetch receiver account ---
@@ -179,13 +191,42 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     @Override
-    public List<TransactionEntity> getTransactionsByAccount(String accountNumber) {
+    public List<TransactionResponse> getTransactionsByAccount(String accountNumber) {
+        return getTransactionsByAccountForExport(accountNumber).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
+        public PageResponse<TransactionResponse> getAllTransactions(int page, int size) {
+        int normalizedPage = Math.max(page, 0);
+        int normalizedSize = size > 0 ? size : 20;
+
+        Page<TransactionEntity> transactionPage = transactionRepository.findAllByOrderByCreatedDateDesc(
+            PageRequest.of(normalizedPage, normalizedSize));
+
+        List<TransactionResponse> content = transactionPage
+                .getContent().stream()
+                .map(this::toResponse)
+                .toList();
+
+        return PageResponse.<TransactionResponse>builder()
+            .content(content)
+            .page(transactionPage.getNumber())
+            .size(transactionPage.getSize())
+            .totalElements(transactionPage.getTotalElements())
+            .totalPages(transactionPage.getTotalPages())
+            .build();
+    }
+
+    @Override
+    public List<TransactionEntity> getTransactionsByAccountForExport(String accountNumber) {
         return transactionRepository.findBySenderAccountNumberOrReceiverAccountNumberOrderByCreatedDateDesc(
                 accountNumber, accountNumber);
     }
 
     @Override
-    public List<TransactionEntity> getAllTransactions() {
+    public List<TransactionEntity> getAllTransactionsForExport() {
         return transactionRepository.findAllByOrderByCreatedDateDesc();
     }
 
@@ -195,6 +236,25 @@ public class TransactionServiceImpl implements TransactionService {
         TransactionEntity txn = transactionRepository.findByTransactionId(transactionId)
                 .orElseThrow(() -> new BusinessException(
                     "Transaction not found: " + transactionId, HttpStatus.NOT_FOUND));
+
+        AccountEntity sender = accountRepository.findByAccountNumber(txn.getSenderAccountNumber())
+                .orElse(null);
+        AccountEntity receiver = accountRepository.findByAccountNumber(txn.getReceiverAccountNumber())
+                .orElse(null);
+
+        if (sender != null) {
+            sender.setAmount(sender.getAmount().add(txn.getAmount()));
+            accountRepository.save(sender);
+        }
+
+        if (receiver != null) {
+            receiver.setAmount(receiver.getAmount().subtract(txn.getAmount()));
+            accountRepository.save(receiver);
+        }
+
+        log.info("Reversed balances for transaction {} before deletion. senderFound={}, receiverFound={}",
+                transactionId, sender != null, receiver != null);
+
         transactionRepository.delete(txn);
         log.info("Transaction deleted: {}", transactionId);
     }
@@ -223,8 +283,22 @@ public class TransactionServiceImpl implements TransactionService {
         }
     }
 
-    private String getStr(Map<String, Object> map, String key) {
-        Object val = map.get(key);
-        return val != null ? val.toString().trim() : null;
+    private String safeTrim(String value) {
+        return value != null ? value.trim() : null;
+    }
+
+    private TransactionResponse toResponse(TransactionEntity transaction) {
+        return TransactionResponse.builder()
+                .transactionId(transaction.getTransactionId())
+                .senderAccountNumber(transaction.getSenderAccountNumber())
+                .receiverAccountNumber(transaction.getReceiverAccountNumber())
+                .amount(transaction.getAmount())
+                .transactionType(transaction.getTransactionType())
+                .description(transaction.getDescription())
+                .createdDate(transaction.getCreatedDate())
+                .timestamp(transaction.getCreatedDate())
+                .pin("")
+                .status(transaction.getStatus())
+                .build();
     }
 }

@@ -1,16 +1,17 @@
 package com.bank.simulator.controller;
 
+import com.bank.simulator.dto.AccountResponse;
 import com.bank.simulator.dto.ApiResponse;
-import com.bank.simulator.entity.AccountEntity;
+import com.bank.simulator.dto.CreateAccountRequest;
+import com.bank.simulator.dto.PageResponse;
+import com.bank.simulator.dto.UpdateAccountRequest;
 import com.bank.simulator.service.AccountService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/account")
@@ -25,7 +26,7 @@ public class AccountController {
      * Create a new bank account (auto-links customer by Aadhar).
      */
     @PostMapping("/add")
-    public ResponseEntity<ApiResponse<String>> createAccount(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<ApiResponse<String>> createAccount(@Valid @RequestBody CreateAccountRequest payload) {
         String result = accountService.createAccount(payload);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Account created successfully", result));
@@ -36,15 +37,11 @@ public class AccountController {
      * Get all accounts.
      */
     @GetMapping("/all")
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAllAccounts() {
-        List<AccountEntity> accounts = accountService.getAllAccounts();
-
-        // Map to response format matching frontend expectations
-        List<Map<String, Object>> accountList = accounts.stream()
-                .map(this::toAccountMap)
-                .toList();
-
-        return ResponseEntity.ok(ApiResponse.success("Accounts retrieved successfully", accountList));
+    public ResponseEntity<ApiResponse<PageResponse<AccountResponse>>> getAllAccounts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        PageResponse<AccountResponse> accounts = accountService.getAllAccounts(page, size);
+        return ResponseEntity.ok(ApiResponse.success("Accounts retrieved successfully", accounts));
     }
 
     /**
@@ -52,9 +49,9 @@ public class AccountController {
      * Get an account by account number.
      */
     @GetMapping("/number/{accountNumber}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getAccountByNumber(@PathVariable String accountNumber) {
-        AccountEntity account = accountService.getAccountByNumber(accountNumber);
-        return ResponseEntity.ok(ApiResponse.success("Account retrieved successfully", toAccountMap(account)));
+    public ResponseEntity<ApiResponse<AccountResponse>> getAccountByNumber(@PathVariable String accountNumber) {
+        AccountResponse account = accountService.getAccountByNumber(accountNumber);
+        return ResponseEntity.ok(ApiResponse.success("Account retrieved successfully", account));
     }
 
     /**
@@ -64,7 +61,7 @@ public class AccountController {
     @PutMapping("/number/{accountNumber}")
     public ResponseEntity<ApiResponse<Void>> updateAccount(
             @PathVariable String accountNumber,
-            @RequestBody Map<String, Object> payload) {
+            @Valid @RequestBody UpdateAccountRequest payload) {
         accountService.updateAccountByNumber(accountNumber, payload);
         return ResponseEntity.ok(ApiResponse.success("Account updated successfully"));
     }
@@ -77,27 +74,5 @@ public class AccountController {
     public ResponseEntity<ApiResponse<Void>> deleteAccount(@PathVariable String accountNumber) {
         accountService.deleteAccountByNumber(accountNumber);
         return ResponseEntity.ok(ApiResponse.success("Account deleted successfully"));
-    }
-
-    /**
-     * Maps AccountEntity to a Map matching frontend interface expectations.
-     * Exposes: accountId, customerId, accountNumber, aadharNumber, ifscCode,
-     * phoneNumberLinked, amount, bankName, nameOnAccount, status, created, modified
-     */
-    private Map<String, Object> toAccountMap(AccountEntity a) {
-        return Map.ofEntries(
-            Map.entry("accountId", String.valueOf(a.getId())),
-            Map.entry("customerId", a.getCustomer() != null ? String.valueOf(a.getCustomer().getId()) : ""),
-            Map.entry("accountNumber", a.getAccountNumber()),
-            Map.entry("aadharNumber", a.getAadharNumber()),
-            Map.entry("ifscCode", a.getIfscCode()),
-            Map.entry("phoneNumberLinked", a.getPhoneNumberLinked()),
-            Map.entry("amount", a.getAmount()),
-            Map.entry("bankName", a.getBankName()),
-            Map.entry("nameOnAccount", a.getNameOnAccount()),
-            Map.entry("status", a.getStatus()),
-            Map.entry("created", a.getCreated() != null ? a.getCreated().toString() : ""),
-            Map.entry("modified", a.getModified() != null ? a.getModified().toString() : "")
-        );
     }
 }

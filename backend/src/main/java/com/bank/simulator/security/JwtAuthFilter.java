@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -42,20 +45,35 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         try {
             String email = jwtUtil.extractEmail(jwt);
+            String role = jwtUtil.extractRole(jwt);
 
-            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
-
-                if (jwtUtil.validateToken(jwt, userDetails)) {
+            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null && jwtUtil.isTokenValid(jwt)) {
+                if (role != null && !role.isBlank()) {
+                    List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(toRoleAuthority(role)));
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(
-                                    userDetails,
+                                    email,
                                     null,
-                                    userDetails.getAuthorities()
+                                    authorities
                             );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                    log.debug("JWT authenticated for user: {}", email);
+                    log.debug("JWT authenticated from token claims for user: {}", email);
+                } else {
+                    // Fallback safety for older tokens that do not include role claim.
+                    UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
+
+                    if (jwtUtil.validateToken(jwt, userDetails)) {
+                        UsernamePasswordAuthenticationToken authToken =
+                                new UsernamePasswordAuthenticationToken(
+                                        userDetails,
+                                        null,
+                                        userDetails.getAuthorities()
+                                );
+                        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authToken);
+                        log.debug("JWT authenticated using DB fallback for user: {}", email);
+                    }
                 }
             }
         } catch (Exception ex) {
@@ -63,5 +81,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private String toRoleAuthority(String roleClaim) {
+        return roleClaim.startsWith("ROLE_") ? roleClaim : "ROLE_" + roleClaim;
     }
 }

@@ -1,14 +1,14 @@
 package com.bank.simulator.service;
 
-import com.bank.simulator.entity.AccountEntity;
-
-import java.util.List;
-import java.util.Map;
+import com.bank.simulator.dto.AccountResponse;
+import com.bank.simulator.dto.CreateAccountRequest;
+import com.bank.simulator.dto.PageResponse;
+import com.bank.simulator.dto.UpdateAccountRequest;
 
 public interface AccountService {
-    String createAccount(Map<String, Object> payload);
-    AccountEntity getAccountByNumber(String accountNumber);
-    List<AccountEntity> getAllAccounts();
-    void updateAccountByNumber(String accountNumber, Map<String, Object> payload);
+    String createAccount(CreateAccountRequest payload);
+    AccountResponse getAccountByNumber(String accountNumber);
+    PageResponse<AccountResponse> getAllAccounts(int page, int size);
+    void updateAccountByNumber(String accountNumber, UpdateAccountRequest payload);
     void deleteAccountByNumber(String accountNumber);
 }

@@ -21,11 +21,20 @@ export interface ApiResponse<T> {
   timestamp: string;
 }
 
+interface PageResponse<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
 export const customerService = {
   getAllCustomers: async (): Promise<Customer[]> => {
     try {
-      const response = await axios.get<ApiResponse<Customer[]>>(`${API_BASE_URL}/customer/all`);
-      return response.data.data;
+      const response = await axios.get<ApiResponse<Customer[] | PageResponse<Customer>>>(`${API_BASE_URL}/customer/all`);
+      const data = response.data.data;
+      return Array.isArray(data) ? data : data.content;
     } catch (error: any) {
       console.error(' Error fetching customers:', error);
       throw error;

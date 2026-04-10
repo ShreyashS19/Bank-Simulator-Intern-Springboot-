@@ -1,6 +1,7 @@
 package com.bank.simulator.repository;
 
 import com.bank.simulator.entity.TransactionEntity;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -17,6 +18,8 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
             String senderAccountNumber, String receiverAccountNumber);
 
     List<TransactionEntity> findAllByOrderByCreatedDateDesc();
+
+    Page<TransactionEntity> findAllByOrderByCreatedDateDesc(Pageable pageable);
 
     Optional<TransactionEntity> findByTransactionId(String transactionId);
 

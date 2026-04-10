@@ -1,18 +1,18 @@
 package com.bank.simulator.service;
 
-import com.bank.simulator.entity.CustomerEntity;
-
-import java.util.List;
-import java.util.Map;
+import com.bank.simulator.dto.CreateCustomerRequest;
+import com.bank.simulator.dto.CustomerResponse;
+import com.bank.simulator.dto.PageResponse;
+import com.bank.simulator.dto.UpdateCustomerRequest;
 
 public interface CustomerService {
-    String createCustomer(Map<String, Object> payload);
+    String createCustomer(CreateCustomerRequest payload);
 
-    CustomerEntity getCustomerByAadhar(String aadharNumber);
+    CustomerResponse getCustomerByAadhar(String aadharNumber);
 
-    List<CustomerEntity> getAllCustomers();
+    PageResponse<CustomerResponse> getAllCustomers(int page, int size);
 
-    void updateCustomerByAadhar(String aadharNumber, Map<String, Object> payload);
+    void updateCustomerByAadhar(String aadharNumber, UpdateCustomerRequest payload);
 
     void deleteCustomerByAadhar(String aadharNumber);
 }
