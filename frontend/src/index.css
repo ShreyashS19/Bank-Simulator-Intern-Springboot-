@@ -111,3 +111,27 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .glass-card {
+    @apply bg-white/70 dark:bg-slate-900/40 backdrop-blur-xl border border-white/20 dark:border-white/5 shadow-xl;
+  }
+  
+  .glass-panel {
+    @apply bg-black/5 dark:bg-white/5 backdrop-blur-md rounded-2xl border border-white/10;
+  }
+  
+  .text-glow {
+    text-shadow: 0 0 15px currentColor;
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+  }
+}

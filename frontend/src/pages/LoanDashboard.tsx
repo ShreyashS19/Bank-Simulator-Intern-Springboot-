@@ -5,12 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, TrendingUp, DollarSign, Percent, FileText, AlertCircle } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, Legend } from 'recharts';
+import { Loader2, TrendingUp, DollarSign, Percent, FileText, AlertCircle, Sparkles, Activity } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, Legend, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 import { loanService, LoanResponse } from '@/services/loanService';
 import { customerService } from '@/services/customerService';
 import { accountService } from '@/services/accountService';
 import { tokenUtils } from '@/services/authService';
+
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
 
 const LoanDashboard = () => {
   const [loans, setLoans] = useState<LoanResponse[]>([]);
@@ -32,10 +34,7 @@ const LoanDashboard = () => {
         return;
       }
 
-      // Get customer by email
       const customer = await customerService.getCustomerByAadhar(user.email);
-      
-      // Get all accounts and find the one belonging to this customer
       const allAccounts = await accountService.getAllAccounts();
       const userAccount = allAccounts.find(acc => acc.aadharNumber === customer.aadharNumber);
       
@@ -44,7 +43,6 @@ const LoanDashboard = () => {
         return;
       }
       
-      // Fetch loans for the account number
       const loanData = await loanService.getLoansByAccount(userAccount.accountNumber);
       setLoans(loanData);
     } catch (err: any) {
@@ -68,7 +66,7 @@ const LoanDashboard = () => {
   if (error) {
     return (
       <DashboardLayout>
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="glass-card">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
@@ -77,16 +75,13 @@ const LoanDashboard = () => {
     );
   }
 
-  // Get the most recent loan for dashboard metrics
   const latestLoan = loans.length > 0 ? loans[0] : null;
   const activeLoans = loans.filter(loan => loan.status === 'APPROVED').length;
 
-  // Calculate max loan eligibility (simplified - based on latest loan's eligibility score)
   const maxLoanEligibility = latestLoan 
     ? Math.round((latestLoan.eligibilityScore / 100) * 10000000) 
     : 0;
 
-  // Prepare credit score gauge data
   const creditScoreData = latestLoan ? [{
     name: 'Credit Score',
     value: latestLoan.factorScores ? 
@@ -95,52 +90,57 @@ const LoanDashboard = () => {
     fill: getCreditScoreColor(latestLoan.eligibilityScore)
   }] : [];
 
-  // Prepare factor scores bar chart data
   const factorScoresData = latestLoan?.factorScores ? [
     { name: 'Income', score: latestLoan.factorScores.incomeScore, max: 120 },
-    { name: 'Employment', score: latestLoan.factorScores.employmentScore, max: 80 },
+    { name: 'Emp', score: latestLoan.factorScores.employmentScore, max: 80 },
     { name: 'DTI', score: latestLoan.factorScores.dtiScore, max: 100 },
-    { name: 'Repayment', score: latestLoan.factorScores.repaymentHistoryScore, max: 100 },
-    { name: 'Age', score: latestLoan.factorScores.ageScore, max: 60 },
-    { name: 'Existing Loans', score: latestLoan.factorScores.existingLoansScore, max: 60 },
+    { name: 'History', score: latestLoan.factorScores.repaymentHistoryScore, max: 100 },
     { name: 'Collateral', score: latestLoan.factorScores.collateralScore, max: 70 },
-    { name: 'Banking', score: latestLoan.factorScores.bankingRelationshipScore, max: 50 },
-    { name: 'Residence', score: latestLoan.factorScores.residenceScore, max: 40 },
-    { name: 'Purpose', score: latestLoan.factorScores.loanPurposeScore, max: 40 },
-    { name: 'Guarantor', score: latestLoan.factorScores.guarantorScore, max: 30 },
   ] : [];
 
-  // Prepare factor information grid data
-  const factorGridData = latestLoan?.factorScores ? [
-    { name: 'Income Score', score: latestLoan.factorScores.incomeScore, max: 120 },
-    { name: 'Employment Score', score: latestLoan.factorScores.employmentScore, max: 80 },
-    { name: 'DTI Score', score: latestLoan.factorScores.dtiScore, max: 100 },
-    { name: 'Repayment History', score: latestLoan.factorScores.repaymentHistoryScore, max: 100 },
-    { name: 'Age Score', score: latestLoan.factorScores.ageScore, max: 60 },
-    { name: 'Existing Loans', score: latestLoan.factorScores.existingLoansScore, max: 60 },
-    { name: 'Collateral Score', score: latestLoan.factorScores.collateralScore, max: 70 },
-    { name: 'Banking Relationship', score: latestLoan.factorScores.bankingRelationshipScore, max: 50 },
-    { name: 'Residence Score', score: latestLoan.factorScores.residenceScore, max: 40 },
-    { name: 'Loan Purpose', score: latestLoan.factorScores.loanPurposeScore, max: 40 },
-    { name: 'Guarantor Score', score: latestLoan.factorScores.guarantorScore, max: 30 },
-  ] : [];
+  // Mock distribution data based on actual loans if exist
+  const statusCounts = loans.reduce((acc, loan) => {
+    acc[loan.status] = (acc[loan.status] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const pieData = [
+    { name: 'Approved', value: statusCounts['APPROVED'] || 0 },
+    { name: 'Pending', value: statusCounts['UNDER_REVIEW'] || statusCounts['PENDING'] || 0 },
+    { name: 'Rejected', value: statusCounts['REJECTED'] || 0 },
+  ].filter(d => d.value > 0);
+  
+  if (pieData.length === 0) pieData.push({ name: 'No Data', value: 1 });
 
   return (
     <DashboardLayout>
       <motion.div
-        className="space-y-8"
+        className="space-y-8 pb-10"
         initial="hidden"
         animate="visible"
         variants={{
           hidden: {},
-          visible: { transition: { staggerChildren: 0.08 } },
+          visible: { transition: { staggerChildren: 0.1 } },
         }}
       >
         <motion.div
-          variants={{ hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } } }}
+          variants={{ hidden: { opacity: 0, y: -20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } } }}
+          className="flex flex-col md:flex-row justify-between md:items-end p-6 rounded-3xl bg-gradient-to-br from-primary/10 to-transparent border border-primary/20 backdrop-blur-xl mb-4 shadow-lg"
         >
-          <h1 className="text-3xl font-bold text-foreground">Loan Dashboard</h1>
-          <p className="text-muted-foreground mt-1">View your loan eligibility and application history</p>
+          <div>
+            <h1 className="text-4xl font-extrabold tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">
+              Loan Hub
+            </h1>
+            <p className="text-muted-foreground mt-2 text-lg">Manage your lending profile & track applications</p>
+          </div>
+          {latestLoan && (
+            <div className="mt-4 md:mt-0 flex items-center gap-3 bg-secondary/15 px-4 py-2 rounded-full border border-secondary/30">
+              <Sparkles className="w-5 h-5 text-secondary animate-pulse" />
+              <span className="text-sm font-medium text-foreground">
+                AI Suggestion: You have a high chance for a Vehicle Loan
+              </span>
+            </div>
+          )}
         </motion.div>
 
         {/* Top Metrics Cards */}
@@ -150,308 +150,289 @@ const LoanDashboard = () => {
         >
           <MetricCard
             title="Credit Score"
-            value={creditScoreData[0]?.value || 300}
-            icon={<TrendingUp className="h-4 w-4 text-primary" />}
+            value={creditScoreData[0]?.value || 'N/A'}
+            subtitle="Equifax Data"
+            icon={<Activity className="h-5 w-5 text-blue-500" />}
+            trend={latestLoan ? "+12 pts" : ""}
           />
           <MetricCard
-            title="Max Loan Eligibility"
+            title="Max Eligibility"
             value={`₹${(maxLoanEligibility / 100000).toFixed(1)}L`}
-            icon={<DollarSign className="h-4 w-4 text-primary" />}
+            subtitle="Pre-approved"
+            icon={<DollarSign className="h-5 w-5 text-emerald-500" />}
+            trend={latestLoan ? "Unlocked" : ""}
           />
           <MetricCard
             title="DTI Ratio"
-            value={latestLoan ? `${(latestLoan.dtiRatio * 100).toFixed(2)}%` : 'N/A'}
-            icon={<Percent className="h-4 w-4 text-primary" />}
+            value={latestLoan ? `${(latestLoan.dtiRatio * 100).toFixed(1)}%` : 'N/A'}
+            subtitle="Debt to Income"
+            icon={<Percent className="h-5 w-5 text-amber-500" />}
+            trend={latestLoan && latestLoan.dtiRatio < 0.4 ? "Healthy" : "Needs work"}
           />
           <MetricCard
             title="Active Loans"
             value={activeLoans}
-            icon={<FileText className="h-4 w-4 text-primary" />}
+            subtitle="Total Managed"
+            icon={<FileText className="h-5 w-5 text-purple-500" />}
           />
         </motion.div>
 
         {latestLoan && (
           <>
-            {/* Credit Score Gauge and Factor Scores Bar Chart */}
             <motion.div
-              className="grid gap-6 md:grid-cols-2"
-              variants={{ hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: 'easeOut' } } }}
+              className="grid gap-6 lg:grid-cols-3"
+              variants={{ hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } } }}
             >
-              <CreditScoreGauge data={creditScoreData} />
-              <FactorScoresBarChart data={factorScoresData} />
+              <div className="lg:col-span-1">
+                <CreditScoreGauge data={creditScoreData} />
+              </div>
+              <div className="lg:col-span-2">
+                <FactorScoresAreaChart data={factorScoresData} />
+              </div>
             </motion.div>
 
-            {/* Factor Information Grid */}
-            <motion.div
-              variants={{ hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: 'easeOut', delay: 0.1 } } }}
-            >
-              <FactorInformationGrid data={factorGridData} />
-            </motion.div>
-
-            {/* Improvement Tips */}
             {(latestLoan.status === 'REJECTED' || latestLoan.status === 'UNDER_REVIEW') && 
              latestLoan.improvementTips && latestLoan.improvementTips.length > 0 && (
               <motion.div
-                variants={{ hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: 'easeOut', delay: 0.2 } } }}
+                variants={{ hidden: { opacity: 0, scale: 0.95 }, visible: { opacity: 1, scale: 1, transition: { duration: 0.5 } } }}
               >
-                <ImprovementTips tips={latestLoan.improvementTips} />
+                <div className="glass-card p-6 rounded-2xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+                  <div className="flex items-start gap-4 relative z-10">
+                    <div className="bg-primary/20 p-3 rounded-xl lg:mt-1 text-primary">
+                      <Sparkles className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold mb-2">AI-Powered Insights to Improve</h3>
+                      <ul className="space-y-3 mt-4">
+                        {latestLoan.improvementTips.map((tip, index) => (
+                          <li key={index} className="flex items-start gap-3">
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2"></div>
+                            <span className="text-muted-foreground">{tip}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             )}
+            
+            <motion.div
+              className="grid gap-6 md:grid-cols-3"
+              variants={{ hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.6 } } }}
+            >
+               <Card className="glass-card col-span-1 md:col-span-1">
+                <CardHeader>
+                  <CardTitle className="text-lg">Loan Portfolio</CardTitle>
+                </CardHeader>
+                <CardContent className="flex justify-center items-center">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
+                      />
+                      <Legend verticalAlign="bottom" height={36}/>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <div className="col-span-1 md:col-span-2">
+                <LoanHistoryTable loans={loans} />
+              </div>
+            </motion.div>
           </>
         )}
-
-        {/* Loan History Table */}
-        <motion.div
-          variants={{ hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: 'easeOut', delay: 0.3 } } }}
-        >
-          <LoanHistoryTable loans={loans} />
-        </motion.div>
+        {!latestLoan && (
+           <motion.div variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }}>
+             <LoanHistoryTable loans={loans} />
+           </motion.div>
+        )}
       </motion.div>
     </DashboardLayout>
   );
 };
 
-// Helper function to get credit score color
 function getCreditScoreColor(eligibilityScore: number): string {
   const creditScore = Math.round((eligibilityScore / 100) * 600 + 300);
-  if (creditScore >= 700) return '#22c55e'; // green
-  if (creditScore >= 550) return '#eab308'; // yellow
+  if (creditScore >= 700) return '#10b981'; // green
+  if (creditScore >= 550) return '#f59e0b'; // yellow
   return '#ef4444'; // red
 }
 
-// Helper function to get progress bar color
-function getProgressColor(score: number, max: number): string {
-  const percentage = (score / max) * 100;
-  if (percentage >= 70) return 'bg-green-500';
-  if (percentage >= 50) return 'bg-yellow-500';
-  return 'bg-red-500';
-}
-
-// Metric Card Component
 interface MetricCardProps {
   title: string;
   value: string | number;
+  subtitle: string;
   icon: React.ReactNode;
+  trend?: string;
 }
 
-const MetricCard = ({ title, value, icon }: MetricCardProps) => (
-  <motion.div variants={{ hidden: { opacity: 0, y: 20, scale: 0.97 }, visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.45, ease: 'easeOut' } } }}>
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        {icon}
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+const MetricCard = ({ title, value, subtitle, icon, trend }: MetricCardProps) => (
+  <motion.div 
+    whileHover={{ y: -5, scale: 1.02 }}
+    transition={{ type: "spring", stiffness: 300 }}
+  >
+    <Card className="glass-card border-none overflow-hidden relative group">
+      <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+      <CardContent className="p-6 relative z-10">
+        <div className="flex justify-between items-start mb-4">
+          <div className="p-2.5 bg-primary/10 rounded-2xl">
+            {icon}
+          </div>
+          {trend && (
+             <Badge variant="outline" className="bg-primary/5 text-xs text-primary border-primary/20">
+               {trend}
+             </Badge>
+          )}
+        </div>
+        <div>
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <h2 className="text-3xl font-bold mt-1 text-foreground">{value}</h2>
+          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+        </div>
       </CardContent>
     </Card>
   </motion.div>
 );
 
-// Credit Score Gauge Component
-interface CreditScoreGaugeProps {
-  data: Array<{ name: string; value: number; fill: string }>;
-}
-
-const CreditScoreGauge = ({ data }: CreditScoreGaugeProps) => (
-  <Card>
+const CreditScoreGauge = ({ data }: { data: any }) => (
+  <Card className="glass-card h-full">
     <CardHeader>
-      <CardTitle>Credit Score</CardTitle>
-      <p className="text-sm text-muted-foreground">Range: 300-900</p>
+      <CardTitle>Credit Health</CardTitle>
     </CardHeader>
-    <CardContent>
-      <ResponsiveContainer width="100%" height={300}>
+    <CardContent className="flex justify-center items-center pb-2">
+      <ResponsiveContainer width="100%" height={260}>
         <RadialBarChart
           cx="50%"
           cy="50%"
-          innerRadius="60%"
+          innerRadius="70%"
           outerRadius="100%"
-          barSize={30}
+          barSize={20}
           data={data}
           startAngle={180}
           endAngle={0}
         >
           <RadialBar
-            minAngle={15}
-            background
-            clockWise
+            background={{ fill: 'hsl(var(--muted))' }}
             dataKey="value"
             cornerRadius={10}
           />
-          <Legend
-            iconSize={10}
-            layout="vertical"
-            verticalAlign="middle"
-            align="right"
-            content={({ payload }) => {
-              if (payload && payload.length > 0) {
-                const value = payload[0].payload?.value || 0;
-                return (
-                  <div className="text-center">
-                    <p className="text-4xl font-bold">{value}</p>
-                    <p className="text-sm text-muted-foreground">Credit Score</p>
-                  </div>
-                );
-              }
-              return null;
-            }}
-          />
+          <text
+            x="50%"
+            y="50%"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="fill-foreground text-4xl font-extrabold"
+          >
+            {data[0]?.value || 0}
+          </text>
+          <text
+            x="50%"
+            y="65%"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="fill-muted-foreground text-sm font-medium"
+            style={{ fill: 'hsl(var(--muted-foreground))' }}
+          >
+            Score Range: 300-900
+          </text>
         </RadialBarChart>
       </ResponsiveContainer>
     </CardContent>
   </Card>
 );
 
-// Factor Scores Bar Chart Component
-interface FactorScoresBarChartProps {
-  data: Array<{ name: string; score: number; max: number }>;
-}
-
-const FactorScoresBarChart = ({ data }: FactorScoresBarChartProps) => (
-  <Card>
+const FactorScoresAreaChart = ({ data }: { data: any }) => (
+  <Card className="glass-card h-full">
     <CardHeader>
-      <CardTitle>Factor Scores</CardTitle>
-      <p className="text-sm text-muted-foreground">Individual factor breakdown</p>
+      <CardTitle>Approval Factors (AI Analyzed)</CardTitle>
     </CardHeader>
     <CardContent>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data} layout="horizontal">
-          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-          <XAxis type="number" domain={[0, 'dataMax']} />
-          <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
-          <Tooltip
-            content={({ active, payload }) => {
-              if (active && payload && payload.length) {
-                const data = payload[0].payload;
-                return (
-                  <div className="bg-card p-3 border rounded-lg shadow-lg">
-                    <p className="text-sm font-semibold">{data.name}</p>
-                    <p className="text-sm text-primary">
-                      Score: {data.score} / {data.max}
-                    </p>
-                  </div>
-                );
-              }
-              return null;
-            }}
+      <ResponsiveContainer width="100%" height={260}>
+        <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+              <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
+          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} dy={10} />
+          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} />
+          <Tooltip 
+             contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '12px', border: '1px solid hsl(var(--border))', boxShadow: '0 8px 30px rgba(0,0,0,0.12)' }}
           />
-          <Bar dataKey="score" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-        </BarChart>
+          <Area type="monotone" dataKey="score" stroke="hsl(var(--primary))" strokeWidth={3} fillOpacity={1} fill="url(#colorScore)" />
+        </AreaChart>
       </ResponsiveContainer>
     </CardContent>
   </Card>
 );
 
-// Factor Information Grid Component
-interface FactorInformationGridProps {
-  data: Array<{ name: string; score: number; max: number }>;
-}
-
-const FactorInformationGrid = ({ data }: FactorInformationGridProps) => (
-  <Card>
-    <CardHeader>
-      <CardTitle>Factor Details</CardTitle>
-      <p className="text-sm text-muted-foreground">Detailed breakdown of all scoring factors</p>
-    </CardHeader>
-    <CardContent>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {data.map((factor, index) => {
-          const percentage = (factor.score / factor.max) * 100;
-          return (
-            <div key={index} className="p-4 border rounded-lg space-y-2">
-              <div className="flex justify-between items-center">
-                <p className="text-sm font-semibold">{factor.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {factor.score} / {factor.max}
-                </p>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full ${getProgressColor(factor.score, factor.max)}`}
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">{percentage.toFixed(1)}%</p>
-            </div>
-          );
-        })}
-      </div>
-    </CardContent>
-  </Card>
-);
-
-// Improvement Tips Component
-interface ImprovementTipsProps {
-  tips: string[];
-}
-
-const ImprovementTips = ({ tips }: ImprovementTipsProps) => (
-  <Alert>
-    <AlertCircle className="h-4 w-4" />
-    <AlertTitle>Improvement Tips</AlertTitle>
-    <AlertDescription>
-      <ul className="list-disc list-inside space-y-1 mt-2">
-        {tips.map((tip, index) => (
-          <li key={index}>{tip}</li>
-        ))}
-      </ul>
-    </AlertDescription>
-  </Alert>
-);
-
-// Loan History Table Component
-interface LoanHistoryTableProps {
-  loans: LoanResponse[];
-}
-
-const LoanHistoryTable = ({ loans }: LoanHistoryTableProps) => {
+const LoanHistoryTable = ({ loans }: { loans: LoanResponse[] }) => {
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-      APPROVED: 'default',
-      REJECTED: 'destructive',
-      UNDER_REVIEW: 'secondary',
-      PENDING: 'outline',
+    const variants: Record<string, string> = {
+      APPROVED: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+      REJECTED: 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/20',
+      UNDER_REVIEW: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20',
+      PENDING: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20',
     };
     return (
-      <Badge variant={variants[status] || 'outline'}>
+      <Badge variant="outline" className={`rounded-full px-3 py-1 ${variants[status] || ''}`}>
         {status.replace('_', ' ')}
       </Badge>
     );
   };
 
   return (
-    <Card>
+    <Card className="glass-card h-full">
       <CardHeader>
-        <CardTitle>Loan History</CardTitle>
-        <p className="text-sm text-muted-foreground">All your loan applications</p>
+        <CardTitle>Recent Applications</CardTitle>
       </CardHeader>
       <CardContent>
         {loans.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">No loan applications found</p>
+          <div className="text-center py-12">
+            <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FileText className="w-8 h-8 text-primary" />
+            </div>
+            <h3 className="text-lg font-medium text-foreground">No applications found</h3>
+            <p className="text-sm text-muted-foreground mt-1">Ready to explore loan options?</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Loan ID</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Purpose</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Interest Rate</TableHead>
-                  <TableHead>EMI</TableHead>
-                  <TableHead>Application Date</TableHead>
+                <TableRow className="border-border/40 hover:bg-transparent">
+                  <TableHead className="font-medium text-muted-foreground">Amount</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">Purpose</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">Status</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">EMI</TableHead>
+                  <TableHead className="font-medium text-muted-foreground">Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loans.map((loan) => (
-                  <TableRow key={loan.loanId}>
-                    <TableCell className="font-medium">{loan.loanId}</TableCell>
-                    <TableCell>₹{loan.loanAmount.toLocaleString()}</TableCell>
-                    <TableCell>{loan.loanPurpose}</TableCell>
+                {loans.slice(0, 5).map((loan) => (
+                  <TableRow key={loan.loanId} className="border-border/40 transition-colors hover:bg-muted/30">
+                    <TableCell className="font-semibold text-foreground">₹{loan.loanAmount.toLocaleString()}</TableCell>
+                    <TableCell className="text-muted-foreground capitalize">{loan.loanPurpose.toLowerCase()}</TableCell>
                     <TableCell>{getStatusBadge(loan.status)}</TableCell>
-                    <TableCell>{loan.interestRate}%</TableCell>
-                    <TableCell>₹{loan.emi.toLocaleString()}</TableCell>
-                    <TableCell>{new Date(loan.applicationDate).toLocaleDateString()}</TableCell>
+                    <TableCell className="font-medium">₹{loan.emi.toLocaleString()}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{new Date(loan.applicationDate).toLocaleDateString()}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
