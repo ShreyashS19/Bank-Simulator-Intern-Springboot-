@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutDashboard, Users, CreditCard, ArrowLeftRight, LogOut, Menu, X, Shield, FileText, ChevronDown, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Users, CreditCard, ArrowLeftRight, LogOut, Menu, X, Shield, FileText, ChevronDown, ChevronRight, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -122,6 +122,13 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           label: "Apply for Loan"
         }
       ]
+    },
+    { 
+      path: "/reset-pin", 
+      icon: KeyRound, 
+      label: "Reset PIN", 
+      showAlways: true,
+      showForAdmin: true
     },
   ];
 

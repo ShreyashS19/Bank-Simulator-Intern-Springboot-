@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/bank-simulator/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 export interface Account {
   accountId?: string;
@@ -115,6 +115,28 @@ export const accountService = {
     } catch (error: any) {
       console.error(' Error deleting account:', error);
       throw error;
+    }
+  },
+
+  forgotPin: async (email: string): Promise<ApiResponse<void>> => {
+    try {
+      const response = await axios.post<ApiResponse<void>>(`${API_BASE_URL}/account/forgot-pin`, { email }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error;
+    }
+  },
+
+  resetPin: async (email: string, otp: string, newPin: string): Promise<ApiResponse<void>> => {
+    try {
+      const response = await axios.post<ApiResponse<void>>(`${API_BASE_URL}/account/reset-pin`, { email, otp, newPin }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error;
     }
   }
 };

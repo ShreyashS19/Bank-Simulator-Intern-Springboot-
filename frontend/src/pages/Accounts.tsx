@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Search, CreditCard, Loader2, Eye, Edit, Trash2 } from "lucide-react";
+import { Search, CreditCard, Loader2, Eye, Edit, Trash2, KeyRound } from "lucide-react";
 import { accountService, Account } from "@/services/accountService";
 import { AccountViewModal } from "@/components/AccountViewModal";
 import { AccountEditModal } from "@/components/AccountEditModal";
@@ -22,6 +22,14 @@ const Accounts = () => {
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<Account | null>(null);
   const [viewingAccount, setViewingAccount] = useState<Account | null>(null);
+  
+  // Pin Reset State
+  const [pinResetModalOpen, setPinResetModalOpen] = useState(false);
+  const [pinResetStep, setPinResetStep] = useState<1 | 2>(1);
+  const [pinResetOtp, setPinResetOtp] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [isPinResetting, setIsPinResetting] = useState(false);
+
   const [formData, setFormData] = useState({
     accountNumber: "",
     aadharNumber: "",
@@ -138,26 +146,61 @@ const Accounts = () => {
   };
 
   const handleDelete = async () => {
-    if (!deletingAccount) return;
+    if (!deletingAccount?.accountNumber) return;
+    
     setIsLoading(true);
     try {
       await accountService.deleteAccount(deletingAccount.accountNumber);
       toast.success("Account deleted successfully!");
-      setDeletingAccount(null);
-      
       if (searchedAccount?.accountNumber === deletingAccount.accountNumber) {
         setSearchedAccount(null);
-        setAccountSearch("");
       }
-    } catch (error: any) {
-      if (error.response?.data?.message) {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error("Failed to delete account");
-      }
+      setDeletingAccount(null);
+    } catch (error) {
       console.error(error);
+      toast.error("Failed to delete account");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleForgotPin = async () => {
+    const userEmail = localStorage.getItem('userEmail');
+    if (!userEmail) {
+      toast.error("User email not found in session");
+      return;
+    }
+    setIsPinResetting(true);
+    try {
+      await accountService.forgotPin(userEmail);
+      toast.success("OTP sent to your email!");
+      setPinResetStep(2);
+      setPinResetModalOpen(true);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send OTP");
+    } finally {
+      setIsPinResetting(false);
+    }
+  };
+
+  const handleResetPinSubmit = async () => {
+    const userEmail = localStorage.getItem('userEmail');
+    if (!userEmail || !pinResetOtp || !newPin) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    setIsPinResetting(true);
+    try {
+      await accountService.resetPin(userEmail, pinResetOtp, newPin);
+      toast.success("Account PIN reset successfully!");
+      setPinResetModalOpen(false);
+      setPinResetStep(1);
+      setPinResetOtp("");
+      setNewPin("");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to reset PIN");
+    } finally {
+      setIsPinResetting(false);
     }
   };
 
@@ -387,7 +430,7 @@ const Accounts = () => {
                     </div>
                     <div>
                       <Label className="text-muted-foreground">Balance</Label>
-                      <p className="font-medium">₹{searchedAccount.amount.toLocaleString()}</p>
+                      <p className="font-medium">â‚¹{searchedAccount.amount.toLocaleString()}</p>
                     </div>
                     <div>
                       <Label className="text-muted-foreground">Status</Label>
@@ -402,6 +445,10 @@ const Accounts = () => {
                     <Button variant="outline" size="sm" onClick={() => setEditingAccount(searchedAccount)}>
                       <Edit className="h-4 w-4 mr-2" />
                       Edit
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleForgotPin} disabled={isPinResetting}>
+                      <KeyRound className="h-4 w-4 mr-2" />
+                      Reset PIN
                     </Button>
                     <Button variant="destructive" size="sm" onClick={() => setDeletingAccount(searchedAccount)}>
                       <Trash2 className="h-4 w-4 mr-2" />
@@ -454,8 +501,57 @@ const Accounts = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reset PIN Modal */}
+      <AlertDialog open={pinResetModalOpen} onOpenChange={setPinResetModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Account PIN</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pinResetStep === 1 
+                ? "Requesting OTP to reset your account PIN securely." 
+                : "Enter the OTP sent to your email and your new 6-digit PIN."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          {pinResetStep === 2 && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="pinOtp">6-Digit OTP</Label>
+                <Input
+                  id="pinOtp"
+                  maxLength={6}
+                  value={pinResetOtp}
+                  onChange={(e) => setPinResetOtp(e.target.value.replace(/\D/g, ''))}
+                  placeholder="123456"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newPin">New 6-Digit PIN</Label>
+                <Input
+                  id="newPin"
+                  type="password"
+                  maxLength={6}
+                  value={newPin}
+                  onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+                  placeholder="******"
+                />
+              </div>
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => { setPinResetModalOpen(false); setPinResetStep(1); }}>Cancel</Button>
+            <Button onClick={handleResetPinSubmit} disabled={isPinResetting || pinResetStep === 1}>
+              {isPinResetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {isPinResetting ? "Processing..." : "Confirm PIN Reset"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };
 
 export default Accounts;
+

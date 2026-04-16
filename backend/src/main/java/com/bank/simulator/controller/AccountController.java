@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -74,5 +75,27 @@ public class AccountController {
     public ResponseEntity<ApiResponse<Void>> deleteAccount(@PathVariable String accountNumber) {
         accountService.deleteAccountByNumber(accountNumber);
         return ResponseEntity.ok(ApiResponse.success("Account deleted successfully"));
+    }
+
+    /**
+     * POST /api/account/forgot-pin
+     * Request an OTP for PIN reset (JWT protected).
+     */
+    @PostMapping("/forgot-pin")
+    public ResponseEntity<ApiResponse<Void>> forgotPin(@Valid @RequestBody com.bank.simulator.dto.ForgotPinRequest request) {
+        String jwtEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        accountService.generateAndSendPinOtp(request.getEmail(), jwtEmail);
+        return ResponseEntity.ok(ApiResponse.success("If the account exists, a PIN reset OTP has been sent."));
+    }
+
+    /**
+     * POST /api/account/reset-pin
+     * Submit OTP and new PIN to reset account PIN (JWT protected).
+     */
+    @PostMapping("/reset-pin")
+    public ResponseEntity<ApiResponse<Void>> resetPin(@Valid @RequestBody com.bank.simulator.dto.ResetPinRequest request) {
+        String jwtEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        accountService.resetPin(request.getEmail(), request.getOtp(), request.getNewPin(), jwtEmail);
+        return ResponseEntity.ok(ApiResponse.success("Account PIN reset successfully."));
     }
 }

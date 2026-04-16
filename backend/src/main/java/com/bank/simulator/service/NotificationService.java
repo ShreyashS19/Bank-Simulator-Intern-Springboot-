@@ -1,6 +1,7 @@
 package com.bank.simulator.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 public interface NotificationService {
 
@@ -35,4 +36,30 @@ public interface NotificationService {
             String transactionId);
 
     boolean sendNotification(String toEmail, String subject, String body);
+
+    // ─── OTP & Reset Emails ───────────────────────────────────────────────────
+
+    /**
+     * Send the 6-digit OTP email for password reset.
+     * Called asynchronously — does not block the API response.
+     */
+    void sendPasswordResetOtpEmail(String toEmail, String userName, String otp, LocalDateTime expiryTime);
+
+    /**
+     * Send the 6-digit OTP email for PIN reset.
+     * Called asynchronously — does not block the API response.
+     */
+    void sendPinResetOtpEmail(String toEmail, String userName, String otp, LocalDateTime expiryTime);
+
+    /**
+     * Send a confirmation email after a successful password reset.
+     * Called asynchronously — does not block the API response.
+     */
+    void sendPasswordResetSuccessEmail(String toEmail, String userName, LocalDateTime resetTime);
+
+    /**
+     * Send a confirmation email after a successful PIN reset.
+     * Called asynchronously — does not block the API response.
+     */
+    void sendPinResetSuccessEmail(String toEmail, String userName, LocalDateTime resetTime);
 }

@@ -66,8 +66,13 @@ public class SecurityConfig {
             .sessionManagement(session ->
                     session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Public auth endpoints
-                .requestMatchers(HttpMethod.POST, "/auth/signup", "/auth/login").permitAll()
+                // Public auth endpoints (login, signup, forgot/reset password — no JWT needed)
+                .requestMatchers(HttpMethod.POST,
+                        "/auth/signup",
+                        "/auth/login",
+                        "/auth/forgot-password",
+                        "/auth/reset-password"
+                ).permitAll()
                 // Public OAuth helper endpoints
                 .requestMatchers(HttpMethod.GET, "/oauth/providers", "/oauth-success").permitAll()
                 // Swagger/OpenAPI

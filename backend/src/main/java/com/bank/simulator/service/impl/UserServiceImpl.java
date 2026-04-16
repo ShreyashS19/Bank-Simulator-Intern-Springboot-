@@ -16,6 +16,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.bank.simulator.entity.OtpEntity;
+import com.bank.simulator.entity.OtpPurpose;
+import com.bank.simulator.repository.OtpRepository;
+import com.bank.simulator.service.NotificationService;
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
 
 import java.util.HashMap;
 import java.util.List;
@@ -26,11 +32,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class UserServiceImpl implements UserService {
-
     private final UserRepository userRepository;
     private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final OtpRepository otpRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -152,5 +159,96 @@ public class UserServiceImpl implements UserService {
         user.setActive(active);
         userRepository.save(user);
         log.info("User {} status updated to active={}", email, active);
+    }
+    // ======================== FORGOT / RESET PASSWORD ========================
+
+    @Override
+    @Transactional
+    public void generateAndSendPasswordOtp(String email) {
+        // 1. Layer 1 Rate Limiting: Max 3 requests per hour
+        LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
+        long recentRequests = otpRepository.countByEmailAndPurposeAndCreatedAtAfter(
+                email, OtpPurpose.PASSWORD_RESET, oneHourAgo);
+        
+        if (recentRequests >= 3) {
+            log.warn("Rate limit exceeded for password reset OTP: {} requests in last hour for email: {}", recentRequests, email);
+            throw new BusinessException("Too many OTP requests. Please try again after 1 hour.", HttpStatus.TOO_MANY_REQUESTS);
+        }
+
+        // 2. Lookup user silently (don't reveal if email exists or not to prevent enumeration)
+        UserEntity user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            log.warn("Password reset requested for non-existent email: {}", email);
+            return; // Silent fail (pretend it sent)
+        }
+
+        // 3. Invalidate old OTPs for this purpose
+        otpRepository.invalidateExistingOtps(email, OtpPurpose.PASSWORD_RESET);
+
+        // 4. Generate 6-digit SecureRandom OTP
+        SecureRandom random = new SecureRandom();
+        String otp = String.format("%06d", random.nextInt(1000000));
+        LocalDateTime expiryTime = LocalDateTime.now().plusMinutes(10);
+
+        // 5. Save OTP Entity
+        OtpEntity otpEntity = OtpEntity.builder()
+                .email(email)
+                .otp(otp)
+                .expiryTime(expiryTime)
+                .isUsed(false)
+                .purpose(OtpPurpose.PASSWORD_RESET)
+                .attemptCount(0)
+                .build();
+        otpRepository.save(otpEntity);
+
+        // 6. Send Async Email
+        notificationService.sendPasswordResetOtpEmail(email, user.getFullName(), otp, expiryTime);
+        log.info("Password reset OTP generated for email: {}", email);
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(String email, String otp, String newPassword) {
+        // 1. Fetch the active OTP
+        OtpEntity otpEntity = otpRepository.findTopByEmailAndPurposeAndIsUsedFalseOrderByCreatedAtDesc(
+                email, OtpPurpose.PASSWORD_RESET)
+                .orElseThrow(() -> new BusinessException("Invalid or expired OTP", HttpStatus.BAD_REQUEST));
+
+        // 2. Validate Expiry
+        if (otpEntity.getExpiryTime().isBefore(LocalDateTime.now())) {
+            throw new BusinessException("OTP has expired. Please request a new one.", HttpStatus.BAD_REQUEST);
+        }
+
+        // 3. Check attempt count
+        if (otpEntity.getAttemptCount() >= 5) {
+            throw new BusinessException("Maximum attempts reached. Please request a new OTP.", HttpStatus.TOO_MANY_REQUESTS);
+        }
+
+        // 4. Match OTP (increment attempts if wrong)
+        if (!otpEntity.getOtp().equals(otp)) {
+            otpEntity.setAttemptCount(otpEntity.getAttemptCount() + 1);
+            otpRepository.save(otpEntity);
+            throw new BusinessException("Invalid OTP", HttpStatus.BAD_REQUEST);
+        }
+
+        // 5. Validate Password Strength
+        if (!newPassword.matches("^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=!]).{8,}$")) {
+            throw new BusinessException("Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.", HttpStatus.BAD_REQUEST);
+        }
+
+        // 6. Update Password
+        UserEntity user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException("User no longer exists", HttpStatus.NOT_FOUND));
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // 7. Mark OTP as used
+        otpEntity.setUsed(true);
+        otpRepository.save(otpEntity);
+
+        // 8. Send Success Email Async
+        notificationService.sendPasswordResetSuccessEmail(email, user.getFullName(), LocalDateTime.now());
+        log.info("Password successfully reset for email: {}", email);
     }
 }

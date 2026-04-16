@@ -1,12 +1,12 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Chrome, LogIn, Loader2, Shield } from "lucide-react";
+import { Chrome, LogIn, Loader2, Shield, ArrowLeft, KeyRound } from "lucide-react";
 import { authService } from "@/services/authService";
 import LoginTransitionOverlay from "@/components/LoginTransitionOverlay";
 
@@ -17,6 +17,14 @@ const Login = () => {
     password: ""
   });
   const [loading, setLoading] = useState(false);
+  
+  // Forgot Password state
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordStep, setForgotPasswordStep] = useState<1 | 2>(1);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+
   // Transition overlay state
   const [transition, setTransition] = useState<{ show: boolean; userName: string; target: string }>({
     show: false,
@@ -117,9 +125,42 @@ const Login = () => {
     }
   };
 
+  const handleForgotPasswordSubmitEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail) { toast.error("Please enter email"); return; }
+    setLoading(true);
+    try {
+      await authService.forgotPassword(forgotEmail);
+      toast.success("OTP sent to your email!");
+      setForgotPasswordStep(2);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPasswordSubmitReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otp || !newPassword) { toast.error("Please fill in all fields"); return; }
+    setLoading(true);
+    try {
+      await authService.resetPassword(forgotEmail, otp, newPassword);
+      toast.success("Password reset successful! Please log in.");
+      setShowForgotPassword(false);
+      setForgotPasswordStep(1);
+      setOtp("");
+      setNewPassword("");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to reset password");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
-      {/* Transition overlay — mounts on top of everything after auth */}
+      {/* Transition overlay â€” mounts on top of everything after auth */}
       {transition.show && (
         <LoginTransitionOverlay
           userName={transition.userName}
@@ -138,75 +179,168 @@ const Login = () => {
           </Link>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">Welcome Back</CardTitle>
-            <CardDescription>Enter your credentials to access your account</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Logging in...
-                  </>
-                ) : (
-                  <>
-                    <LogIn className="mr-2 h-4 w-4" />
-                    Login
-                  </>
-                )}
-              </Button>
-
-              <div className="relative py-1">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">or</span>
-                </div>
-              </div>
-
-              <Button type="button" variant="outline" className="w-full" disabled={loading} onClick={handleGoogleContinue}>
-                <Chrome className="mr-2 h-4 w-4" />
-                Continue with Google
-              </Button>
-            </form>
-
-            <div className="mt-4 text-center text-sm">
-              <span className="text-muted-foreground">New user? </span>
-              <Link to="/signup" className="text-primary hover:underline font-medium">
-                Sign Up
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
+                <AnimatePresence mode="wait">
+          {!showForgotPassword ? (
+            <motion.div
+              key="login"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-2xl">Welcome Back</CardTitle>
+                  <CardDescription>Enter your credentials to access your account</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="Enter your password"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="flex justify-end mt-1">
+                      <Button variant="link" className="px-0 py-0 h-auto font-normal text-xs text-muted-foreground hover:text-primary" onClick={() => setShowForgotPassword(true)} type="button">
+                        Forgot password?
+                      </Button>
+                    </div>
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Logging in...
+                        </>
+                      ) : (
+                        <>
+                          <LogIn className="mr-2 h-4 w-4" />
+                          Login
+                        </>
+                      )}
+                    </Button>
+      
+                    <div className="relative py-1">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">or</span>
+                      </div>
+                    </div>
+      
+                    <Button type="button" variant="outline" className="w-full" disabled={loading} onClick={handleGoogleContinue}>
+                      <Chrome className="mr-2 h-4 w-4" />
+                      Continue with Google
+                    </Button>
+                  </form>
+      
+                  <div className="mt-4 text-center text-sm">
+                    <span className="text-muted-foreground">New user? </span>
+                    <Link to="/signup" className="text-primary hover:underline font-medium">
+                      Sign Up
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="forgot-password"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => { setShowForgotPassword(false); setForgotPasswordStep(1); }} type="button">
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <CardTitle className="text-xl">Reset Password</CardTitle>
+                  </div>
+                  <CardDescription>
+                    {forgotPasswordStep === 1 
+                      ? "Enter your email to receive a One-Time Password."
+                      : "Enter the OTP sent to your email and your new password."}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {forgotPasswordStep === 1 ? (
+                    <form onSubmit={handleForgotPasswordSubmitEmail} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="forgotEmail">Email Address</Label>
+                        <Input
+                          id="forgotEmail"
+                          type="email"
+                          placeholder="name@example.com"
+                          value={forgotEmail}
+                          onChange={(e) => setForgotEmail(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <Button type="submit" className="w-full" disabled={loading}>
+                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                        {loading ? "Sending..." : "Send OTP"}
+                      </Button>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleForgotPasswordSubmitReset} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="otp">6-Digit OTP</Label>
+                        <Input
+                          id="otp"
+                          type="text"
+                          maxLength={6}
+                          placeholder="123456"
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="newPassword">New Password</Label>
+                        <Input
+                          id="newPassword"
+                          type="password"
+                          placeholder="Strong password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <Button type="submit" className="w-full" disabled={loading}>
+                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Shield className="mr-2 h-4 w-4" />}
+                        {loading ? "Verifying..." : "Reset Password"}
+                      </Button>
+                    </form>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );
 };
 
 export default Login;
+

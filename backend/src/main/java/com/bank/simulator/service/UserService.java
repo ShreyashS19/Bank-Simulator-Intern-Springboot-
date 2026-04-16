@@ -15,4 +15,6 @@ public interface UserService {
     List<Map<String, Object>> getAllUsers();
     Map<String, Object> getUserByEmail(String email);
     void updateUserStatus(String email, boolean active);
+    void generateAndSendPasswordOtp(String email);
+    void resetPassword(String email, String otp, String newPassword);
 }

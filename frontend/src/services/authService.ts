@@ -193,6 +193,24 @@ export const authService = {
     );
     return response.data;
   },
+
+  forgotPassword: async (email: string): Promise<ApiResponse<void>> => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/auth/forgot-password`, { email });
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error;
+    }
+  },
+
+  resetPassword: async (email: string, otp: string, newPassword: string): Promise<ApiResponse<void>> => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/auth/reset-password`, { email, otp, newPassword });
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error;
+    }
+  }
 };
 
 export default authService;

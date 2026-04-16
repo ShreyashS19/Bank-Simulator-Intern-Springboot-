@@ -16,6 +16,7 @@ import LoanDashboard from "./pages/LoanDashboard";
 import AdminLoanManagement from "./pages/AdminLoanManagement";
 import NotFound from "./pages/NotFound";
 import { LoanApplicationForm } from "./components/LoanApplicationForm";
+import ResetPinPage from "./pages/ResetPinPage";
 
 // ─── Import interceptors to initialize globally ───────────────────────────────
 import './utils/axiosConfig';
@@ -146,6 +147,15 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <LoanApplicationForm />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/reset-pin"
+            element={
+              <ProtectedRoute>
+                <ResetPinPage />
               </ProtectedRoute>
             }
           />

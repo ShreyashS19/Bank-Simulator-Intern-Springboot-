@@ -17,6 +17,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.bank.simulator.entity.OtpEntity;
+import com.bank.simulator.entity.OtpPurpose;
+import com.bank.simulator.repository.OtpRepository;
+import com.bank.simulator.service.NotificationService;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -25,9 +32,11 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class AccountServiceImpl implements AccountService {
-
     private final AccountRepository accountRepository;
     private final CustomerRepository customerRepository;
+    private final OtpRepository otpRepository;
+    private final NotificationService notificationService;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
@@ -196,5 +205,90 @@ public class AccountServiceImpl implements AccountService {
                 .created(account.getCreated())
                 .modified(account.getModified())
                 .build();
+    }
+    // ======================== PIN RESET ========================
+
+    @Override
+    @Transactional
+    public void generateAndSendPinOtp(String email, String jwtEmail) {
+        // Enforce JWT ownership
+        if (!email.equalsIgnoreCase(jwtEmail)) {
+            throw new BusinessException("Unauthorized to request PIN reset for this email", HttpStatus.FORBIDDEN);
+        }
+
+        // Layer 1 Rate Limiting: Max 3 requests per hour
+        LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
+        long recentRequests = otpRepository.countByEmailAndPurposeAndCreatedAtAfter(
+                email, OtpPurpose.PIN_RESET, oneHourAgo);
+        
+        if (recentRequests >= 3) {
+            log.warn("Rate limit exceeded for PIN reset OTP: {} requests in last hour for email: {}", recentRequests, email);
+            throw new BusinessException("Too many OTP requests. Please try again after 1 hour.", HttpStatus.TOO_MANY_REQUESTS);
+        }
+
+        CustomerEntity customer = customerRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException("Customer not found", HttpStatus.NOT_FOUND));
+
+        // Invalidate old OTPs
+        otpRepository.invalidateExistingOtps(email, OtpPurpose.PIN_RESET);
+
+        SecureRandom random = new SecureRandom();
+        String otp = String.format("%06d", random.nextInt(1000000));
+        LocalDateTime expiryTime = LocalDateTime.now().plusMinutes(10);
+
+        OtpEntity otpEntity = OtpEntity.builder()
+                .email(email)
+                .otp(otp)
+                .expiryTime(expiryTime)
+                .isUsed(false)
+                .purpose(OtpPurpose.PIN_RESET)
+                .attemptCount(0)
+                .build();
+        otpRepository.save(otpEntity);
+
+        notificationService.sendPinResetOtpEmail(email, customer.getName(), otp, expiryTime);
+        log.info("PIN reset OTP generated for customer email: {}", email);
+    }
+
+    @Override
+    @Transactional
+    public void resetPin(String email, String otp, String newPin, String jwtEmail) {
+        if (!email.equalsIgnoreCase(jwtEmail)) {
+            throw new BusinessException("Unauthorized to reset PIN for this email", HttpStatus.FORBIDDEN);
+        }
+
+        OtpEntity otpEntity = otpRepository.findTopByEmailAndPurposeAndIsUsedFalseOrderByCreatedAtDesc(
+                email, OtpPurpose.PIN_RESET)
+                .orElseThrow(() -> new BusinessException("Invalid or expired OTP", HttpStatus.BAD_REQUEST));
+
+        if (otpEntity.getExpiryTime().isBefore(LocalDateTime.now())) {
+            throw new BusinessException("OTP has expired. Please request a new one.", HttpStatus.BAD_REQUEST);
+        }
+
+        if (otpEntity.getAttemptCount() >= 5) {
+            throw new BusinessException("Maximum attempts reached. Please request a new OTP.", HttpStatus.TOO_MANY_REQUESTS);
+        }
+
+        if (!otpEntity.getOtp().equals(otp)) {
+            otpEntity.setAttemptCount(otpEntity.getAttemptCount() + 1);
+            otpRepository.save(otpEntity);
+            throw new BusinessException("Invalid OTP", HttpStatus.BAD_REQUEST);
+        }
+
+        if (newPin == null || !newPin.matches("\\d{6}")) {
+            throw new BusinessException("PIN must be exactly 6 digits", HttpStatus.BAD_REQUEST);
+        }
+
+        CustomerEntity customer = customerRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException("Customer not found", HttpStatus.NOT_FOUND));
+
+        customer.setCustomerPin(passwordEncoder.encode(newPin));
+        customerRepository.save(customer);
+
+        otpEntity.setUsed(true);
+        otpRepository.save(otpEntity);
+
+        notificationService.sendPinResetSuccessEmail(email, customer.getName(), LocalDateTime.now());
+        log.info("PIN successfully reset for customer email: {}", email);
     }
 }

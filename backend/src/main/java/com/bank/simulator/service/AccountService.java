@@ -11,4 +11,6 @@ public interface AccountService {
     PageResponse<AccountResponse> getAllAccounts(int page, int size);
     void updateAccountByNumber(String accountNumber, UpdateAccountRequest payload);
     void deleteAccountByNumber(String accountNumber);
+    void generateAndSendPinOtp(String email, String jwtEmail);
+    void resetPin(String email, String otp, String newPin, String jwtEmail);
 }

@@ -313,4 +313,129 @@ public class NotificationServiceImpl implements NotificationService {
                 amount.toString(), transactionDate, bankName, bankName, bankName
         );
     }
+
+    // ======================== OTP EMAIL METHODS ========================
+
+    @Override
+    @Async
+    public void sendPasswordResetOtpEmail(String toEmail, String userName, String otp, java.time.LocalDateTime expiryTime) {
+        if (!emailEnabled) { log.info("Email disabled. Skipping password reset OTP email."); return; }
+        String subject = "Your Password Reset OTP - Bank Simulator";
+        String body = buildOtpEmailTemplate(userName, otp, expiryTime,
+                "Password Reset Request",
+                "We received a request to reset the password for your account associated with this email address.",
+                "");
+        sendNotification(toEmail, subject, body);
+    }
+
+    @Override
+    @Async
+    public void sendPinResetOtpEmail(String toEmail, String userName, String otp, java.time.LocalDateTime expiryTime) {
+        if (!emailEnabled) { log.info("Email disabled. Skipping PIN reset OTP email."); return; }
+        String subject = "Your PIN Reset OTP - Bank Simulator";
+        String body = buildOtpEmailTemplate(userName, otp, expiryTime,
+                "Account PIN Reset Request",
+                "We received a request to reset the PIN for your bank account.",
+                "<p style=\"color:#555555;font-size:13px;margin-top:12px;\">Your PIN protects your transactions. Never share it with anyone, including bank employees.</p>");
+        sendNotification(toEmail, subject, body);
+    }
+
+    @Override
+    @Async
+    public void sendPasswordResetSuccessEmail(String toEmail, String userName, java.time.LocalDateTime resetTime) {
+        if (!emailEnabled) { log.info("Email disabled. Skipping password reset success email."); return; }
+        String subject = "Your Password Has Been Reset - Bank Simulator";
+        String body = buildSuccessEmailTemplate(userName, resetTime,
+                "Password Reset Successful",
+                "Your password has been successfully reset",
+                "If you did NOT make this change, your account may be compromised. Please contact our support team immediately.");
+        sendNotification(toEmail, subject, body);
+    }
+
+    @Override
+    @Async
+    public void sendPinResetSuccessEmail(String toEmail, String userName, java.time.LocalDateTime resetTime) {
+        if (!emailEnabled) { log.info("Email disabled. Skipping PIN reset success email."); return; }
+        String subject = "Your Account PIN Has Been Reset - Bank Simulator";
+        String body = buildSuccessEmailTemplate(userName, resetTime,
+                "PIN Reset Successful",
+                "Your account PIN has been successfully reset",
+                "If you did NOT request this PIN change, contact us immediately as your account security may be at risk.");
+        sendNotification(toEmail, subject, body);
+    }
+
+    // ─── OTP HTML Template Builder ───────────────────────────────────────────
+
+    private String buildOtpEmailTemplate(String userName, String otp, java.time.LocalDateTime expiryTime,
+                                          String headerTitle, String bodyText, String extraWarning) {
+        String expiryStr = formatDateTime(expiryTime);
+        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head>"
+             + "<body style=\"margin:0;padding:0;background-color:#f4f6f9;font-family:Arial,sans-serif;\">"
+             + "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f6f9;padding:40px 0;\"><tr><td align=\"center\">"
+             + "<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:8px;overflow:hidden;max-width:600px;width:100%;\">"
+             + "<tr><td style=\"background-color:#1a73e8;padding:24px;text-align:center;\">"
+             + "<p style=\"margin:0;font-size:24px;font-weight:bold;color:#ffffff;\">Bank Simulator</p>"
+             + "<p style=\"margin:6px 0 0;font-size:14px;color:#d0e4ff;\">" + headerTitle + "</p>"
+             + "</td></tr>"
+             + "<tr><td style=\"padding:32px 40px;color:#333333;\">"
+             + "<p style=\"font-size:16px;margin:0 0 16px;\">Dear " + userName + ",</p>"
+             + "<p style=\"font-size:15px;margin:0 0 24px;line-height:1.6;\">" + bodyText + "</p>"
+             + "<p style=\"font-size:15px;margin:0 0 12px;font-weight:bold;\">Your One-Time Password (OTP) is:</p>"
+             + "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\">"
+             + "<div style=\"display:inline-block;background-color:#f0f4ff;border:2px solid #1a73e8;border-radius:8px;padding:16px 32px;margin:8px 0 24px;\">"
+             + "<span style=\"font-size:36px;font-weight:700;letter-spacing:12px;color:#1a73e8;\">" + otp + "</span>"
+             + "</div></td></tr></table>"
+             + "<p style=\"color:#e53935;font-size:14px;margin:0 0 8px;\">This OTP is valid for <strong>10 minutes</strong> only.</p>"
+             + "<p style=\"color:#e53935;font-size:13px;margin:0 0 8px;\">Expires at: <strong>" + expiryStr + "</strong></p>"
+             + "<p style=\"color:#555555;font-size:13px;margin:0 0 8px;\">Do not share this OTP with anyone.</p>"
+             + extraWarning
+             + "<p style=\"font-size:14px;margin:24px 0 0;color:#555555;\">If you did not request this, please ignore this email or contact support@banksimulator.com immediately.</p>"
+             + "</td></tr>"
+             + "<tr><td style=\"background-color:#f4f6f9;padding:16px;text-align:center;border-top:1px solid #eeeeee;\">"
+             + "<p style=\"margin:0;font-size:12px;color:#999999;\">&copy; 2025 Bank Simulator. All rights reserved.</p>"
+             + "<p style=\"margin:4px 0 0;font-size:12px;color:#999999;\">This is an automated message. Please do not reply. | Support: support@banksimulator.com</p>"
+             + "</td></tr></table></td></tr></table></body></html>";
+    }
+
+    // ─── Success Email Template Builder ─────────────────────────────────────
+
+    private String buildSuccessEmailTemplate(String userName, java.time.LocalDateTime resetTime,
+                                              String headerTitle, String actionText, String warningText) {
+        String resetStr = formatDateTime(resetTime);
+        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head>"
+             + "<body style=\"margin:0;padding:0;background-color:#f4f6f9;font-family:Arial,sans-serif;\">"
+             + "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f6f9;padding:40px 0;\"><tr><td align=\"center\">"
+             + "<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:8px;overflow:hidden;max-width:600px;width:100%;\">"
+             + "<tr><td style=\"background-color:#2e7d32;padding:24px;text-align:center;\">"
+             + "<p style=\"margin:0;font-size:24px;font-weight:bold;color:#ffffff;\">Bank Simulator</p>"
+             + "<p style=\"margin:6px 0 0;font-size:14px;color:#c8e6c9;\">" + headerTitle + "</p>"
+             + "</td></tr>"
+             + "<tr><td style=\"padding:32px 40px;color:#333333;\">"
+             + "<p style=\"font-size:16px;margin:0 0 16px;\">Dear " + userName + ",</p>"
+             + "<p style=\"font-size:15px;margin:0 0 8px;\"><strong>" + actionText + "</strong> on <strong>" + resetStr + "</strong>.</p>"
+             + "<p style=\"font-size:15px;margin:0 0 24px;\">If you made this change, no further action is required.</p>"
+             + "<div style=\"background-color:#fff8e1;border-left:4px solid #f9a825;padding:16px;border-radius:4px;color:#5d4037;margin-bottom:24px;\">"
+             + "<p style=\"margin:0 0 8px;font-weight:bold;\">" + warningText + "</p>"
+             + "<p style=\"margin:0;font-size:14px;\">Email: support@banksimulator.com | Phone: 1800-XXX-XXXX</p>"
+             + "</div>"
+             + "<p style=\"font-size:14px;font-weight:bold;margin:0 0 8px;\">For your security:</p>"
+             + "<ul style=\"padding-left:20px;line-height:1.8;font-size:14px;color:#555555;\">"
+             + "<li>Never share your credentials with anyone</li>"
+             + "<li>Use a unique password/PIN for banking</li>"
+             + "<li>Enable alerts for all transactions</li>"
+             + "</ul></td></tr>"
+             + "<tr><td style=\"background-color:#f4f6f9;padding:16px;text-align:center;border-top:1px solid #eeeeee;\">"
+             + "<p style=\"margin:0;font-size:12px;color:#999999;\">&copy; 2025 Bank Simulator. All rights reserved.</p>"
+             + "</td></tr></table></td></tr></table></body></html>";
+    }
+
+    // ─── DateTime Formatter (IST) ─────────────────────────────────────────────
+
+    private String formatDateTime(java.time.LocalDateTime dateTime) {
+        java.time.ZonedDateTime ist = dateTime.atZone(java.time.ZoneId.of("Asia/Kolkata"));
+        java.time.format.DateTimeFormatter formatter =
+                java.time.format.DateTimeFormatter.ofPattern("dd MMMM yyyy 'at' h:mm a 'IST'",
+                        java.util.Locale.ENGLISH);
+        return ist.format(formatter);
+    }
 }

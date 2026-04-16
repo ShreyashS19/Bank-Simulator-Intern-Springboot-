@@ -96,4 +96,24 @@ public class AuthController {
         Map<String, Object> user = userService.getUserByEmail(email);
         return ResponseEntity.ok(ApiResponse.success("User retrieved successfully", user));
     }
+
+    /**
+     * POST /api/auth/forgot-password
+     * Request an OTP for password reset.
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody com.bank.simulator.dto.ForgotPasswordRequest request) {
+        userService.generateAndSendPasswordOtp(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success("If the email is registered, an OTP has been sent."));
+    }
+
+    /**
+     * POST /api/auth/reset-password
+     * Submit OTP and new password to reset password.
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody com.bank.simulator.dto.ResetPasswordRequest request) {
+        userService.resetPassword(request.getEmail(), request.getOtp(), request.getNewPassword());
+        return ResponseEntity.ok(ApiResponse.success("Password reset successfully."));
+    }
 }

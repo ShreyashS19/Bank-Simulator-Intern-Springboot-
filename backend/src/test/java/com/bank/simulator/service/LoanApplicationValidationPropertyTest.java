@@ -37,10 +37,10 @@ public class LoanApplicationValidationPropertyTest {
     void missingRequiredFieldsShouldBeRejected(@ForAll("requestsWithMissingFields") LoanApplicationRequest request) {
         // When: Validating a request with missing fields
         Set<ConstraintViolation<LoanApplicationRequest>> violations = validator.validate(request);
-        
+
         // Then: Validation should fail
         Assume.that(!violations.isEmpty());
-        
+
         // And: At least one violation should be present
         assert violations.size() > 0 : "Expected validation violations for missing fields";
     }
@@ -49,7 +49,7 @@ public class LoanApplicationValidationPropertyTest {
     Arbitrary<LoanApplicationRequest> requestsWithMissingFields() {
         return Arbitraries.integers().between(0, 13).flatMap(missingFieldIndex -> {
             LoanApplicationRequest request = new LoanApplicationRequest();
-            
+
             // Set all fields to valid values first
             request.setLoanAmount(BigDecimal.valueOf(100000));
             request.setLoanPurpose("HOME");
@@ -64,7 +64,7 @@ public class LoanApplicationValidationPropertyTest {
             request.setResidenceYears(5);
             request.setHasGuarantor(false);
             request.setRepaymentHistory("CLEAN");
-            
+
             // Now set one field to null based on the index
             switch (missingFieldIndex) {
                 case 0 -> request.setLoanAmount(null);
@@ -85,7 +85,7 @@ public class LoanApplicationValidationPropertyTest {
                     request.setLoanPurpose("");
                 }
             }
-            
+
             return Arbitraries.just(request);
         });
     }
