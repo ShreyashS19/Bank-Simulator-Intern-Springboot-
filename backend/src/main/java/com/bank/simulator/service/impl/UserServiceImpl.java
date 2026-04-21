@@ -69,14 +69,18 @@ public class UserServiceImpl implements UserService {
     @Override
     public LoginResponse login(LoginRequest request) {
         UserEntity user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BusinessException("Invalid email or password", HttpStatus.UNAUTHORIZED));
+            .orElseThrow(() -> new BusinessException(
+                "No account found with this email. Please sign up or use Google login.",
+                HttpStatus.NOT_FOUND));
 
         if (!user.isActive()) {
             throw new BusinessException("Your account has been deactivated. Please contact support.", HttpStatus.FORBIDDEN);
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new BusinessException("Invalid email or password", HttpStatus.UNAUTHORIZED);
+            throw new BusinessException(
+                    "Incorrect password. Please try again or use 'Forgot Password'.",
+                    HttpStatus.UNAUTHORIZED);
         }
 
         String token = jwtUtil.generateToken(user.getEmail(), user.getRole());

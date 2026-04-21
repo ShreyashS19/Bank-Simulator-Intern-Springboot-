@@ -165,11 +165,35 @@ const Login = () => {
         }, 320);
       } else {
         setAuthSuccess(false);
-        if ((response.message || "").toLowerCase().includes("invalid") || (response.message || "").toLowerCase().includes("password")) {
+        const responseMessage = response.message || "";
+        const normalizedMessage = responseMessage.toLowerCase();
+
+        if (normalizedMessage.includes("no account found")) {
+          setLoginErrors((prev) => ({ ...prev, email: "No account found with this email.", password: "" }));
+          setLoginTouched((prev) => ({ ...prev, email: true }));
+          toast.error("No account found with this email.", {
+            duration: 7000,
+            description: "Please sign up or continue with Google.",
+            action: {
+              label: "Sign Up",
+              onClick: () => navigate("/signup"),
+            },
+          });
+        } else if (
+          normalizedMessage.includes("incorrect password") ||
+          normalizedMessage.includes("password") ||
+          normalizedMessage.includes("invalid")
+        ) {
+          setLoginErrors((prev) => ({ ...prev, email: "", password: "Incorrect password. Please try again." }));
           setLoginTouched((prev) => ({ ...prev, password: true }));
-          setLoginErrors((prev) => ({ ...prev, password: "Password does not match" }));
+          toast.error("Incorrect password. Please try again.", {
+            description: "Use 'Forgot Password' if you've forgotten it.",
+          });
+        } else if (normalizedMessage.includes("deactivated")) {
+          toast.error(responseMessage || "Your account has been deactivated. Contact support.", { duration: 7000 });
+        } else {
+          toast.error(responseMessage || "Login failed. Please try again.");
         }
-        toast.error(response.message || "Login failed");
       }
     } catch (error: any) {
       setAuthSuccess(false);
@@ -178,41 +202,33 @@ const Login = () => {
       const errorMessage = error.response?.data?.message || "";
       const statusCode = error.response?.status;
 
-      if (
-        statusCode === 404 ||
-        errorMessage.toLowerCase().includes("no account found") ||
-        errorMessage.toLowerCase().includes("sign up")
-      ) {
-        toast.error(
-          errorMessage || "No account found with this email. Please sign up to create a new account.",
-          {
-            duration: 6000,
-            action: {
-              label: "Sign Up",
-              onClick: () => navigate("/signup"),
-            },
-          }
-        );
+      if (statusCode === 404 || errorMessage.toLowerCase().includes("no account found")) {
+        setLoginErrors((prev) => ({ ...prev, email: "No account found with this email.", password: "" }));
+        setLoginTouched((prev) => ({ ...prev, email: true }));
+        toast.error("No account found with this email.", {
+          duration: 7000,
+          description: "Please sign up or continue with Google.",
+          action: {
+            label: "Sign Up",
+            onClick: () => navigate("/signup"),
+          },
+        });
       } else if (
-        statusCode === 403 ||
-        errorMessage.toLowerCase().includes("deactivated") ||
-        errorMessage.toLowerCase().includes("contact support")
+        statusCode === 401 ||
+        errorMessage.toLowerCase().includes("incorrect password") ||
+        errorMessage.toLowerCase().includes("password")
       ) {
-        toast.error(errorMessage, { duration: 7000 });
-      } else if (errorMessage) {
-        if (statusCode === 401 || errorMessage.toLowerCase().includes("invalid") || errorMessage.toLowerCase().includes("password")) {
-          setLoginTouched((prev) => ({ ...prev, password: true }));
-          setLoginErrors((prev) => ({ ...prev, password: "Password does not match" }));
-        }
-        toast.error(errorMessage);
-      } else if (statusCode === 401) {
+        setLoginErrors((prev) => ({ ...prev, email: "", password: "Incorrect password. Please try again." }));
         setLoginTouched((prev) => ({ ...prev, password: true }));
-        setLoginErrors((prev) => ({ ...prev, password: "Password does not match" }));
-        toast.error("Invalid email or password");
+        toast.error("Incorrect password. Please try again.", {
+          description: "Use 'Forgot Password' if you've forgotten it.",
+        });
+      } else if (statusCode === 403 || errorMessage.toLowerCase().includes("deactivated")) {
+        toast.error(errorMessage || "Your account has been deactivated. Contact support.", { duration: 7000 });
       } else if (error.code === "ERR_NETWORK") {
-        toast.error("Cannot connect to server. Ensure backend is running.");
+        toast.error("Cannot connect to server. Ensure the backend is running.");
       } else {
-        toast.error("Login failed. Please try again.");
+        toast.error(errorMessage || "Login failed. Please try again.");
       }
     } finally {
       setLoading(false);
