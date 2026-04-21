@@ -1,5 +1,5 @@
-﻿import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+﻿import { useCallback, useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +24,12 @@ import {
   validateEmailField,
   validatePasswordField,
 } from "@/lib/authValidation";
+import {
+  ACCOUNT_DEACTIVATED_ERROR_CODE,
+  ACCOUNT_DEACTIVATED_MESSAGE,
+  ACCOUNT_DEACTIVATED_URL_ERROR,
+  OAUTH_FAILED_URL_ERROR,
+} from "@/lib/authMessages";
 
 const GoogleIcon = () => (
   <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" role="img">
@@ -48,6 +54,7 @@ const GoogleIcon = () => (
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -81,6 +88,34 @@ const Login = () => {
   useEffect(() => {
     document.documentElement.classList.remove("custom-cursor-active");
   }, []);
+
+  const showAccountDeactivatedToast = useCallback(() => {
+    toast.error(ACCOUNT_DEACTIVATED_MESSAGE, {
+      duration: 10000,
+      style: {
+        background: "rgba(127, 29, 29, 0.95)",
+        border: "1px solid rgba(220, 38, 38, 0.8)",
+        color: "#fee2e2",
+      },
+    });
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const error = params.get("error");
+
+    if (!error) {
+      return;
+    }
+
+    if (error === ACCOUNT_DEACTIVATED_URL_ERROR) {
+      showAccountDeactivatedToast();
+    } else if (error === OAUTH_FAILED_URL_ERROR) {
+      toast.error("Google login failed. Please try again.");
+    }
+
+    navigate("/login", { replace: true });
+  }, [location.search, navigate, showAccountDeactivatedToast]);
 
   const isLoginFormValid =
     !validateEmailField(formData.email) && formData.password.trim().length > 0;
@@ -190,7 +225,7 @@ const Login = () => {
             description: "Use 'Forgot Password' if you've forgotten it.",
           });
         } else if (normalizedMessage.includes("deactivated")) {
-          toast.error(responseMessage || "Your account has been deactivated. Contact support.", { duration: 7000 });
+          showAccountDeactivatedToast();
         } else {
           toast.error(responseMessage || "Login failed. Please try again.");
         }
@@ -199,10 +234,14 @@ const Login = () => {
       setAuthSuccess(false);
       console.error("Login error:", error);
 
-      const errorMessage = error.response?.data?.message || "";
+      const responsePayload = error.response?.data;
+      const errorCode = responsePayload?.error;
+      const errorMessage = responsePayload?.message || "";
       const statusCode = error.response?.status;
 
-      if (statusCode === 404 || errorMessage.toLowerCase().includes("no account found")) {
+      if (statusCode === 403 && errorCode === ACCOUNT_DEACTIVATED_ERROR_CODE) {
+        showAccountDeactivatedToast();
+      } else if (statusCode === 404 || errorMessage.toLowerCase().includes("no account found")) {
         setLoginErrors((prev) => ({ ...prev, email: "No account found with this email.", password: "" }));
         setLoginTouched((prev) => ({ ...prev, email: true }));
         toast.error("No account found with this email.", {
@@ -224,7 +263,7 @@ const Login = () => {
           description: "Use 'Forgot Password' if you've forgotten it.",
         });
       } else if (statusCode === 403 || errorMessage.toLowerCase().includes("deactivated")) {
-        toast.error(errorMessage || "Your account has been deactivated. Contact support.", { duration: 7000 });
+        showAccountDeactivatedToast();
       } else if (error.code === "ERR_NETWORK") {
         toast.error("Cannot connect to server. Ensure the backend is running.");
       } else {

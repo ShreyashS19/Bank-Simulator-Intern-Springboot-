@@ -2,6 +2,7 @@ package com.bank.simulator.config;
 
 import com.bank.simulator.auth.oauth.handler.OAuthFailureHandler;
 import com.bank.simulator.auth.oauth.handler.OAuthSuccessHandler;
+import com.bank.simulator.auth.oauth.service.CustomOidcUserService;
 import com.bank.simulator.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -38,7 +39,8 @@ public class SecurityConfig {
     @Order(1)
     public SecurityFilterChain oauth2FilterChain(HttpSecurity http,
                                                  OAuthSuccessHandler oAuthSuccessHandler,
-                                                 OAuthFailureHandler oAuthFailureHandler) throws Exception {
+                                                 OAuthFailureHandler oAuthFailureHandler,
+                                                 CustomOidcUserService customOidcUserService) throws Exception {
         http
             .securityMatcher("/oauth2/**", "/login/oauth2/**")
             .csrf(AbstractHttpConfigurer::disable)
@@ -50,6 +52,7 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .oauth2Login(oauth2 -> oauth2
+                .userInfoEndpoint(userInfo -> userInfo.oidcUserService(customOidcUserService))
                 .successHandler(oAuthSuccessHandler)
                 .failureHandler(oAuthFailureHandler)
             );

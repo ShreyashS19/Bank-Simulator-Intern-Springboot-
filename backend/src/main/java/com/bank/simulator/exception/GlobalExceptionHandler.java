@@ -1,5 +1,6 @@
 package com.bank.simulator.exception;
 
+import com.bank.simulator.auth.AuthErrorConstants;
 import com.bank.simulator.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.LazyInitializationException;
@@ -7,12 +8,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
@@ -41,6 +44,23 @@ public class GlobalExceptionHandler {
         log.warn("Validation error: {}", errors);
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error(errors));
+    }
+
+    @ExceptionHandler(DisabledException.class)
+    public ResponseEntity<Map<String, String>> handleDisabledException(DisabledException ex) {
+        if (AuthErrorConstants.ACCOUNT_DEACTIVATED_CODE.equalsIgnoreCase(ex.getMessage())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of(
+                            "error", AuthErrorConstants.ACCOUNT_DEACTIVATED_CODE,
+                            "message", AuthErrorConstants.ACCOUNT_DEACTIVATED_MESSAGE
+                    ));
+        }
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of(
+                        "error", "ACCOUNT_DISABLED",
+                        "message", "Account is disabled"
+                ));
     }
 
     @ExceptionHandler({AuthenticationException.class, BadCredentialsException.class})

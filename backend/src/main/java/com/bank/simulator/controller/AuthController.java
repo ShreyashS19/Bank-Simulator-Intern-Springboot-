@@ -5,6 +5,7 @@ import com.bank.simulator.dto.LoginRequest;
 import com.bank.simulator.dto.LoginResponse;
 import com.bank.simulator.dto.SignupRequest;
 import com.bank.simulator.entity.UserEntity;
+import com.bank.simulator.exception.AccountDeactivatedException;
 import com.bank.simulator.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -49,9 +50,17 @@ public class AuthController {
      * Authenticate user and return JWT token.
      */
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
-        LoginResponse loginResponse = userService.login(request);
-        return ResponseEntity.ok(ApiResponse.success("Login successful", loginResponse));
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
+        try {
+            LoginResponse loginResponse = userService.login(request);
+            return ResponseEntity.ok(ApiResponse.success("Login successful", loginResponse));
+        } catch (AccountDeactivatedException ex) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of(
+                            "error", ex.getErrorCode(),
+                            "message", ex.getMessage()
+                    ));
+        }
     }
 
     /**

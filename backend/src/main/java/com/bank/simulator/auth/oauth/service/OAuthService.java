@@ -1,5 +1,6 @@
 package com.bank.simulator.auth.oauth.service;
 
+import com.bank.simulator.auth.AuthErrorConstants;
 import com.bank.simulator.auth.oauth.dto.OAuthUserInfo;
 import com.bank.simulator.auth.user.AuthProvider;
 import com.bank.simulator.dto.LoginResponse;
@@ -44,7 +45,7 @@ public class OAuthService {
 
     private UserEntity validateActiveUser(UserEntity user) {
         if (!user.isActive()) {
-            throw new BusinessException("Your account has been deactivated. Please contact support.", HttpStatus.FORBIDDEN);
+            throw new BusinessException(AuthErrorConstants.ACCOUNT_DEACTIVATED_MESSAGE, HttpStatus.FORBIDDEN);
         }
 
         if (user.getProvider() == null) {

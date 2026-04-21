@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { authService, tokenUtils, User } from "@/services/authService";
+import { ACCOUNT_DEACTIVATED_URL_ERROR, OAUTH_FAILED_URL_ERROR } from "@/lib/authMessages";
 
 const OAuthSuccess = () => {
   const navigate = useNavigate();
@@ -14,8 +15,10 @@ const OAuthSuccess = () => {
       const error = hashParams.get("error");
 
       if (error) {
-        toast.error("Google login failed. Please try again.");
-        navigate("/login", { replace: true });
+        const loginError = error === ACCOUNT_DEACTIVATED_URL_ERROR
+          ? ACCOUNT_DEACTIVATED_URL_ERROR
+          : OAUTH_FAILED_URL_ERROR;
+        navigate(`/login?error=${encodeURIComponent(loginError)}`, { replace: true });
         return;
       }
 

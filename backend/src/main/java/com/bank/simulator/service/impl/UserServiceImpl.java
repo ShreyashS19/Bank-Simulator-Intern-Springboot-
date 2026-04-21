@@ -5,6 +5,7 @@ import com.bank.simulator.dto.LoginRequest;
 import com.bank.simulator.dto.LoginResponse;
 import com.bank.simulator.dto.SignupRequest;
 import com.bank.simulator.entity.UserEntity;
+import com.bank.simulator.exception.AccountDeactivatedException;
 import com.bank.simulator.exception.BusinessException;
 import com.bank.simulator.repository.CustomerRepository;
 import com.bank.simulator.repository.UserRepository;
@@ -73,14 +74,15 @@ public class UserServiceImpl implements UserService {
                 "No account found with this email. Please sign up or use Google login.",
                 HttpStatus.NOT_FOUND));
 
-        if (!user.isActive()) {
-            throw new BusinessException("Your account has been deactivated. Please contact support.", HttpStatus.FORBIDDEN);
-        }
-
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new BusinessException(
                     "Incorrect password. Please try again or use 'Forgot Password'.",
                     HttpStatus.UNAUTHORIZED);
+        }
+
+        // Check account status only after password validation to avoid account enumeration clues.
+        if (!user.isActive()) {
+            throw new AccountDeactivatedException();
         }
 
         String token = jwtUtil.generateToken(user.getEmail(), user.getRole());
