@@ -2,13 +2,18 @@ package com.bank.simulator.controller;
 
 import com.bank.simulator.dto.*;
 import com.bank.simulator.entity.CustomerEntity;
+import com.bank.simulator.entity.LoanEntity;
 import com.bank.simulator.exception.BusinessException;
 import com.bank.simulator.repository.CustomerRepository;
+import com.bank.simulator.repository.LoanRepository;
+import com.bank.simulator.service.LoanPdfService;
 import com.bank.simulator.service.LoanService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -29,6 +34,8 @@ import java.util.List;
 public class LoanController {
 
     private final LoanService loanService;
+    private final LoanPdfService loanPdfService;
+    private final LoanRepository loanRepository;
     private final CustomerRepository customerRepository;
 
     /**
@@ -39,7 +46,7 @@ public class LoanController {
     //  @Transactional(readOnly = true)
     @Transactional
     @PostMapping("/apply")
-    public ResponseEntity<ApiResponse<LoanResponse>> applyForLoan(
+    public ResponseEntity<ApiResponse<LoanEligibilityResultDto>> applyForLoan(
             @Valid @RequestBody LoanApplicationRequest request) {
         
         // Extract authenticated user's email from JWT
@@ -61,10 +68,46 @@ public class LoanController {
         log.info("Processing loan application for account: {}", accountNumber);
         
         // Process loan application
-        LoanResponse response = loanService.applyForLoan(request, accountNumber);
+        LoanEligibilityResultDto response = loanService.applyForLoan(request, accountNumber);
         
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Loan application submitted successfully", response));
+    }
+
+    /**
+     * GET /api/loan/pdf/{referenceNumber}
+     * Download eligibility advisory PDF for authenticated user.
+     * Admin can download any advisory letter, customer can only download their own.
+     */
+    @GetMapping("/pdf/{referenceNumber}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<byte[]> downloadEligibilityPdf(@PathVariable String referenceNumber) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String email = authentication.getName();
+        String userRole = authentication.getAuthorities().iterator().next().getAuthority();
+
+        LoanEntity loan = loanRepository.findByReferenceNumber(referenceNumber)
+                .orElseThrow(() -> new BusinessException("Loan not found for reference number: " + referenceNumber));
+
+        if (!"ROLE_ADMIN".equals(userRole)) {
+            CustomerEntity customer = customerRepository.findByEmailWithAccounts(email)
+                    .orElseThrow(() -> new BusinessException("Customer not found for email: " + email));
+
+            boolean ownsLoan = customer.getAccounts().stream()
+                    .anyMatch(account -> account.getAccountNumber().equals(loan.getAccountNumber()));
+
+            if (!ownsLoan) {
+                throw new BusinessException("Access denied: You can only download your own eligibility letter");
+            }
+        }
+
+        LoanEligibilityResultDto result = loanService.getEligibilityResultByReferenceNumber(referenceNumber);
+        byte[] pdfBytes = loanPdfService.generateEligibilityPdf(result);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "eligibility-" + referenceNumber + ".pdf");
+        return ResponseEntity.ok().headers(headers).body(pdfBytes);
     }
 
     /**

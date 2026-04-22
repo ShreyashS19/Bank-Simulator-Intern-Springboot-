@@ -1,7 +1,7 @@
 package com.bank.simulator.service;
 
 import com.bank.simulator.dto.LoanApplicationRequest;
-import com.bank.simulator.dto.LoanResponse;
+import com.bank.simulator.dto.LoanEligibilityResultDto;
 import com.bank.simulator.entity.AccountEntity;
 import com.bank.simulator.entity.CustomerEntity;
 import com.bank.simulator.entity.TransactionEntity;
@@ -18,14 +18,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration test for end-to-end loan application processing
- * 
- * Tests complete flow from request to database persistence with real repositories
+ * Integration tests for end-to-end loan eligibility advisory processing.
  */
 @SpringBootTest
 @TestPropertySource(locations = "classpath:test-application.properties")
@@ -99,193 +96,87 @@ public class LoanApplicationIntegrationTest {
     }
 
     @Test
-    void testApprovedLoanApplication() {
-        // Given: A loan application with excellent credit profile
+    void testEligibleLoanApplicationCreatesPendingBankReviewRecord() {
         LoanApplicationRequest request = createLoanRequest();
-        request.setMonthlyIncome(BigDecimal.valueOf(100000)); // High income
-        request.setEmploymentType("GOVERNMENT"); // Stable employment
-        request.setExistingEmi(BigDecimal.valueOf(10000)); // Low DTI (0.10)
-        request.setCreditScore(850); // Excellent credit score
-        request.setAge(35); // Optimal age
-        request.setExistingLoans(0); // No existing loans
+        request.setMonthlyIncome(BigDecimal.valueOf(100000));
+        request.setEmploymentType("GOVERNMENT");
+        request.setExistingEmi(BigDecimal.valueOf(10000));
+        request.setCreditScore(850);
+        request.setAge(35);
+        request.setExistingLoans(0);
         request.setHasCollateral(true);
         request.setResidenceYears(10);
         request.setHasGuarantor(true);
         request.setRepaymentHistory("CLEAN");
 
-        // When: Applying for loan
-        LoanResponse response = loanService.applyForLoan(request, testAccountNumber);
+        LoanEligibilityResultDto response = loanService.applyForLoan(request, testAccountNumber);
 
-        // Then: Loan should be approved
         assertNotNull(response);
-        assertNotNull(response.getLoanId());
-        assertTrue(response.getLoanId().startsWith("LOAN-"));
-        assertEquals("APPROVED", response.getStatus());
-        assertEquals(testAccountNumber, response.getAccountNumber());
-        
-        // Verify eligibility score is high
-        assertTrue(response.getEligibilityScore().doubleValue() >= 75.0,
-                "Expected eligibility score >= 75.0 for approved loan");
-        
-        // Verify interest rate is assigned
-        assertTrue(response.getInterestRate().compareTo(BigDecimal.ZERO) > 0,
-                "Expected positive interest rate for approved loan");
-        
-        // Verify EMI is calculated
-        assertTrue(response.getEmi().compareTo(BigDecimal.ZERO) > 0,
-                "Expected positive EMI for approved loan");
-        
-        // Verify no rejection reason
-        assertTrue(response.getRejectionReason() == null || response.getRejectionReason().isEmpty());
-        
-        // Verify no improvement tips for approved loan
-        assertTrue(response.getImprovementTips().isEmpty(),
-                "Expected no improvement tips for approved loan");
-        
-        // Verify factor scores are populated
-        assertNotNull(response.getFactorScores());
-        assertTrue(response.getFactorScores().getIncomeScore() > 0);
-        assertTrue(response.getFactorScores().getEmploymentScore() > 0);
-        assertTrue(response.getFactorScores().getDtiScore() > 0);
-        assertTrue(response.getFactorScores().getBankingRelationshipScore() > 0);
-        
-        // Verify loan is persisted in database
-        var savedLoan = loanRepository.findByLoanId(response.getLoanId());
+        assertNotNull(response.getReferenceNumber());
+        assertTrue(response.getReferenceNumber().matches("LN-\\d{4}-[A-Z0-9]{6}"));
+        assertEquals("ELIGIBLE", response.getEligibilityStatus());
+        assertEquals("/loan/pdf/" + response.getReferenceNumber(), response.getPdfDownloadPath());
+        assertEquals("testuser@example.com", response.getCustomerEmail());
+
+        var savedLoan = loanRepository.findByReferenceNumber(response.getReferenceNumber());
         assertTrue(savedLoan.isPresent(), "Loan should be persisted in database");
-        assertEquals(response.getStatus(), savedLoan.get().getStatus());
+        assertEquals("PENDING_BANK_REVIEW", savedLoan.get().getStatus());
+        assertEquals("ELIGIBLE", savedLoan.get().getEligibilityStatus());
     }
 
     @Test
-    void testRejectedLoanApplication() {
-        // Given: A loan application with poor credit profile
+    void testNotEligibleLoanApplicationCreatesPendingBankReviewRecord() {
         LoanApplicationRequest request = createLoanRequest();
-        request.setMonthlyIncome(BigDecimal.valueOf(15000)); // Low income
-        request.setEmploymentType("UNEMPLOYED"); // No employment
-        request.setExistingEmi(BigDecimal.valueOf(10000)); // High DTI (0.67)
-        request.setCreditScore(350); // Poor credit score
-        request.setAge(65); // Higher age
-        request.setExistingLoans(5); // Many existing loans
+        request.setMonthlyIncome(BigDecimal.valueOf(15000));
+        request.setEmploymentType("UNEMPLOYED");
+        request.setExistingEmi(BigDecimal.valueOf(10000));
+        request.setCreditScore(350);
+        request.setAge(65);
+        request.setExistingLoans(5);
         request.setHasCollateral(false);
         request.setResidenceYears(0);
         request.setHasGuarantor(false);
         request.setRepaymentHistory("NOT_CLEAN");
 
-        // When: Applying for loan
-        LoanResponse response = loanService.applyForLoan(request, testAccountNumber);
+        LoanEligibilityResultDto response = loanService.applyForLoan(request, testAccountNumber);
 
-        // Then: Loan should be rejected
         assertNotNull(response);
-        assertEquals("REJECTED", response.getStatus());
-        
-        // Verify eligibility score is low
-        assertTrue(response.getEligibilityScore().doubleValue() < 65.0,
-                "Expected eligibility score < 65.0 for rejected loan");
-        
-        // Verify interest rate is 0 for rejected loan
-        assertEquals(BigDecimal.ZERO, response.getInterestRate());
-        
-        // Verify EMI is 0 for rejected loan
-        assertEquals(BigDecimal.ZERO, response.getEmi());
-        
-        // Verify rejection reason is provided
-        assertNotNull(response.getRejectionReason());
-        assertFalse(response.getRejectionReason().isEmpty());
-        
-        // Verify improvement tips are provided
-        assertFalse(response.getImprovementTips().isEmpty(),
-                "Expected improvement tips for rejected loan");
-        
-        // Verify loan is persisted in database
-        var savedLoan = loanRepository.findByLoanId(response.getLoanId());
+        assertEquals("NOT_ELIGIBLE", response.getEligibilityStatus());
+        assertTrue(response.getEligibilityScore().doubleValue() < 65.0);
+
+        var savedLoan = loanRepository.findByReferenceNumber(response.getReferenceNumber());
         assertTrue(savedLoan.isPresent(), "Loan should be persisted in database");
+        assertEquals("PENDING_BANK_REVIEW", savedLoan.get().getStatus());
+        assertEquals("NOT_ELIGIBLE", savedLoan.get().getEligibilityStatus());
     }
 
     @Test
-    void testUnderReviewLoanApplication() {
-        // Given: A loan application with moderate credit profile
+    void testRequiredDocumentsAndSpecialNotesArePresent() {
         LoanApplicationRequest request = createLoanRequest();
-        request.setMonthlyIncome(BigDecimal.valueOf(50000)); // Moderate income
-        request.setEmploymentType("SALARIED"); // Stable employment
-        request.setExistingEmi(BigDecimal.valueOf(22000)); // Moderate DTI (0.44)
-        request.setCreditScore(680); // Good credit score
-        request.setAge(28); // Younger age
-        request.setExistingLoans(2); // Some existing loans
-        request.setHasCollateral(false);
-        request.setResidenceYears(2);
-        request.setHasGuarantor(false);
-        request.setRepaymentHistory("CLEAN");
+        request.setLoanPurpose("HOME");
 
-        // When: Applying for loan
-        LoanResponse response = loanService.applyForLoan(request, testAccountNumber);
+        LoanEligibilityResultDto response = loanService.applyForLoan(request, testAccountNumber);
 
-        // Then: Loan should be under review
-        assertNotNull(response);
-        assertEquals("UNDER_REVIEW", response.getStatus());
-        
-        // Verify eligibility score is moderate
-        double eligibilityScore = response.getEligibilityScore().doubleValue();
-        assertTrue(eligibilityScore >= 65.0 && eligibilityScore < 75.0 || 
-                   response.getDtiRatio().doubleValue() >= 0.40,
-                "Expected moderate eligibility score or high DTI for under review loan");
-        
-        // Verify interest rate is assigned
-        assertTrue(response.getInterestRate().compareTo(BigDecimal.ZERO) > 0);
-        
-        // Verify EMI is calculated
-        assertTrue(response.getEmi().compareTo(BigDecimal.ZERO) > 0);
-        
-        // Verify improvement tips may be provided
-        // (Under review loans may have some weak factors)
-        
-        // Verify loan is persisted in database
-        var savedLoan = loanRepository.findByLoanId(response.getLoanId());
-        assertTrue(savedLoan.isPresent(), "Loan should be persisted in database");
+        assertNotNull(response.getRequiredDocuments());
+        assertTrue(response.getRequiredDocuments().size() >= 5);
+        assertTrue(response.getRequiredDocuments().stream().anyMatch(doc -> doc.contains("Aadhaar")));
+        assertTrue(response.getRequiredDocuments().stream().anyMatch(doc -> doc.contains("Property")));
+
+        assertNotNull(response.getSpecialNotes());
+        assertFalse(response.getSpecialNotes().isEmpty());
+        assertTrue(response.getSpecialNotes().stream().anyMatch(note -> note.contains("PRELIMINARY")));
     }
 
     @Test
-    void testAllFactorScoresAreCalculated() {
-        // Given: A loan application
-        LoanApplicationRequest request = createLoanRequest();
-
-        // When: Applying for loan
-        LoanResponse response = loanService.applyForLoan(request, testAccountNumber);
-
-        // Then: All 11 factor scores should be calculated and non-null
-        assertNotNull(response.getFactorScores());
-        assertNotNull(response.getFactorScores().getIncomeScore());
-        assertNotNull(response.getFactorScores().getEmploymentScore());
-        assertNotNull(response.getFactorScores().getDtiScore());
-        assertNotNull(response.getFactorScores().getRepaymentHistoryScore());
-        assertNotNull(response.getFactorScores().getAgeScore());
-        assertNotNull(response.getFactorScores().getExistingLoansScore());
-        assertNotNull(response.getFactorScores().getCollateralScore());
-        assertNotNull(response.getFactorScores().getBankingRelationshipScore());
-        assertNotNull(response.getFactorScores().getResidenceScore());
-        assertNotNull(response.getFactorScores().getLoanPurposeScore());
-        assertNotNull(response.getFactorScores().getGuarantorScore());
-        
-        // Verify all scores are within valid ranges
-        assertTrue(response.getFactorScores().getIncomeScore() >= 0 && 
-                   response.getFactorScores().getIncomeScore() <= 120);
-        assertTrue(response.getFactorScores().getEmploymentScore() >= 0 && 
-                   response.getFactorScores().getEmploymentScore() <= 80);
-        assertTrue(response.getFactorScores().getDtiScore() >= 0 && 
-                   response.getFactorScores().getDtiScore() <= 100);
-    }
-
-    @Test
-    void testLoanIdUniqueness() {
-        // Given: Two loan applications
+    void testReferenceNumberUniqueness() {
         LoanApplicationRequest request1 = createLoanRequest();
         LoanApplicationRequest request2 = createLoanRequest();
 
-        // When: Applying for both loans
-        LoanResponse response1 = loanService.applyForLoan(request1, testAccountNumber);
-        LoanResponse response2 = loanService.applyForLoan(request2, testAccountNumber);
+        LoanEligibilityResultDto response1 = loanService.applyForLoan(request1, testAccountNumber);
+        LoanEligibilityResultDto response2 = loanService.applyForLoan(request2, testAccountNumber);
 
-        // Then: Loan IDs should be unique
-        assertNotEquals(response1.getLoanId(), response2.getLoanId(),
-                "Loan IDs should be unique");
+        assertNotEquals(response1.getReferenceNumber(), response2.getReferenceNumber(),
+                "Reference numbers should be unique");
     }
 
     private LoanApplicationRequest createLoanRequest() {

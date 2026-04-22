@@ -430,7 +430,7 @@ const Accounts = () => {
                     </div>
                     <div>
                       <Label className="text-muted-foreground">Balance</Label>
-                      <p className="font-medium">â‚¹{searchedAccount.amount.toLocaleString()}</p>
+                      <p className="font-medium">₹{searchedAccount.amount.toLocaleString()}</p>
                     </div>
                     <div>
                       <Label className="text-muted-foreground">Status</Label>

@@ -55,6 +55,16 @@ public class CustomerController {
     }
 
     /**
+     * GET /api/customer/email/{email}
+     * Get customer by email.
+     */
+    @GetMapping("/email/{email}")
+    public ResponseEntity<ApiResponse<CustomerResponse>> getCustomerByEmail(@PathVariable String email) {
+        CustomerResponse customer = customerService.getCustomerByEmail(email);
+        return ResponseEntity.ok(ApiResponse.success("Customer retrieved successfully", customer));
+    }
+
+    /**
      * PUT /api/customer/aadhar/{aadharNumber}
      * Update customer details by Aadhar number.
      */

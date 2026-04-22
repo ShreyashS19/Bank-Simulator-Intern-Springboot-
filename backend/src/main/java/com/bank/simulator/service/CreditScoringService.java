@@ -34,24 +34,29 @@ public class CreditScoringService {
         BigDecimal dtiRatio = calculateDtiRatio(request.getExistingEmi(), request.getMonthlyIncome());
 
         // Calculate all factor scores
-        double incomeScore = calculateIncomeScore(request.getMonthlyIncome());
-        double employmentScore = calculateEmploymentScore(request.getEmploymentType());
-        double dtiScore = calculateDtiScore(dtiRatio);
-        double repaymentHistoryScore = calculateRepaymentHistoryScore(request.getRepaymentHistory());
-        double ageScore = calculateAgeScore(request.getAge());
-        double existingLoansScore = calculateExistingLoansScore(request.getExistingLoans());
-        double collateralScore = calculateCollateralScore(request.getHasCollateral());
-        double bankingRelationshipScore = calculateBankingRelationshipScore(accountNumber);
-        double residenceScore = calculateResidenceScore(request.getResidenceYears());
-        double loanPurposeScore = calculateLoanPurposeScore(request.getLoanPurpose());
-        double guarantorScore = calculateGuarantorScore(request.getHasGuarantor());
+        double incomeScore             = calculateIncomeScore(request.getMonthlyIncome());
+        double employmentScore         = calculateEmploymentScore(request.getEmploymentType());
+        double dtiScore                = calculateDtiScore(dtiRatio);
+        double repaymentHistoryScore   = calculateRepaymentHistoryScore(request.getRepaymentHistory());
+        double ageScore                = calculateAgeScore(request.getAge());
+        double existingLoansScore      = calculateExistingLoansScore(request.getExistingLoans());
+        double collateralScore         = calculateCollateralScore(request.getHasCollateral());
+        double bankingRelationshipScore= calculateBankingRelationshipScore(accountNumber);
+        double residenceScore          = calculateResidenceScore(request.getResidenceYears());
+        double loanPurposeScore        = calculateLoanPurposeScore(request.getLoanPurpose());
+        double guarantorScore          = calculateGuarantorScore(request.getHasGuarantor());
+        // Previously ignored parameters — now correctly scored
+        double creditScorePoints       = calculateCreditScorePoints(request.getCreditScore());
+        double loanToIncomeScore       = calculateLoanToIncomeScore(request.getLoanAmount(), request.getMonthlyIncome());
+        double tenureScore             = calculateTenureScore(request.getLoanTenure());
 
-        // Calculate total eligibility score (sum of all factors / 750 * 100)
-        double totalScore = incomeScore + employmentScore + dtiScore + repaymentHistoryScore +
-                ageScore + existingLoansScore + collateralScore + bankingRelationshipScore +
-                residenceScore + loanPurposeScore + guarantorScore;
+        // Total max = 120+80+100+100+60+60+70+50+40+40+30+150+60+30 = 990
+        double totalScore = incomeScore + employmentScore + dtiScore + repaymentHistoryScore
+                + ageScore + existingLoansScore + collateralScore + bankingRelationshipScore
+                + residenceScore + loanPurposeScore + guarantorScore
+                + creditScorePoints + loanToIncomeScore + tenureScore;
 
-        BigDecimal eligibilityScore = BigDecimal.valueOf((totalScore / 750.0) * 100)
+        BigDecimal eligibilityScore = BigDecimal.valueOf((totalScore / 990.0) * 100)
                 .setScale(2, RoundingMode.HALF_UP);
 
         log.info("Credit score calculation complete. Eligibility score: {}", eligibilityScore);
@@ -68,6 +73,9 @@ public class CreditScoringService {
                 .residenceScore(residenceScore)
                 .loanPurposeScore(loanPurposeScore)
                 .guarantorScore(guarantorScore)
+                .creditScorePoints(creditScorePoints)
+                .loanToIncomeScore(loanToIncomeScore)
+                .tenureScore(tenureScore)
                 .eligibilityScore(eligibilityScore)
                 .dtiRatio(dtiRatio)
                 .build();
@@ -277,5 +285,68 @@ public class CreditScoringService {
             return BigDecimal.ONE;
         }
         return existingEmi.divide(monthlyIncome, 4, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Calculate CIBIL credit score factor (Max: 150 points)
+     * This is the most important single factor in real banking.
+     * Range: 300–900
+     */
+    public double calculateCreditScorePoints(int creditScore) {
+        if (creditScore >= 800) {
+            return 150.0;
+        } else if (creditScore >= 750) {
+            return 120.0;
+        } else if (creditScore >= 700) {
+            return 90.0;
+        } else if (creditScore >= 650) {
+            return 60.0;
+        } else if (creditScore >= 600) {
+            return 30.0;
+        } else {
+            return 0.0;  // < 600 CIBIL — very poor credit
+        }
+    }
+
+    /**
+     * Calculate Loan-to-Income (LTI) ratio score (Max: 60 points)
+     * loanAmount / (monthlyIncome * 12) = annual LTI
+     * High LTI = higher default risk
+     */
+    public double calculateLoanToIncomeScore(BigDecimal loanAmount, BigDecimal monthlyIncome) {
+        if (monthlyIncome == null || monthlyIncome.compareTo(BigDecimal.ZERO) == 0) {
+            return 0.0;
+        }
+        BigDecimal annualIncome = monthlyIncome.multiply(BigDecimal.valueOf(12));
+        double lti = loanAmount.divide(annualIncome, 4, RoundingMode.HALF_UP).doubleValue();
+
+        if (lti < 2.0) {
+            return 60.0;   // Loan < 2x annual income — very safe
+        } else if (lti < 4.0) {
+            return 45.0;   // 2x–4x annual income — acceptable
+        } else if (lti < 6.0) {
+            return 25.0;   // 4x–6x annual income — stretched
+        } else if (lti < 8.0) {
+            return 10.0;   // 6x–8x annual income — risky
+        } else {
+            return 0.0;    // > 8x annual income — too high
+        }
+    }
+
+    /**
+     * Calculate tenure risk score (Max: 30 points)
+     * Shorter tenure = less risk; longer tenure = higher exposure
+     * Tenure in months
+     */
+    public double calculateTenureScore(int tenureMonths) {
+        if (tenureMonths <= 36) {
+            return 30.0;   // Up to 3 years — low risk
+        } else if (tenureMonths <= 84) {
+            return 20.0;   // 3–7 years — moderate
+        } else if (tenureMonths <= 180) {
+            return 10.0;   // 7–15 years — higher exposure
+        } else {
+            return 5.0;    // > 15 years — maximum exposure
+        }
     }
 }

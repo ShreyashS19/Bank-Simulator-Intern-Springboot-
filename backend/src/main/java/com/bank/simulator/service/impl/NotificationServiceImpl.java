@@ -1,18 +1,23 @@
 package com.bank.simulator.service.impl;
 
+import com.bank.simulator.dto.LoanEligibilityResultDto;
 import com.bank.simulator.service.NotificationService;
+import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import jakarta.mail.internet.MimeMessage;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -162,6 +167,123 @@ public class NotificationServiceImpl implements NotificationService {
                     e);
             return false;
         }
+    }
+
+    @Override
+    @Async
+    public void sendEligibilityResultEmail(LoanEligibilityResultDto result) {
+        if (result == null || result.getCustomerEmail() == null || result.getCustomerEmail().isBlank()) {
+            log.warn("Skipping eligibility result email - invalid recipient payload");
+            return;
+        }
+        if (!emailEnabled) {
+            log.info("Email disabled. Skipping eligibility result email for ref {}", result.getReferenceNumber());
+            return;
+        }
+
+        String subject = "Loan Eligibility Result - Ref #" + result.getReferenceNumber() + " | Bank Simulator";
+        String body = buildEligibilityResultTemplate(result);
+        sendNotification(result.getCustomerEmail(), subject, body);
+    }
+
+    private String buildEligibilityResultTemplate(LoanEligibilityResultDto result) {
+        boolean eligible = "ELIGIBLE".equalsIgnoreCase(result.getEligibilityStatus());
+        String badgeColor = eligible ? "#2e7d32" : "#c62828";
+        String badgeText = eligible ? "ELIGIBLE" : "NOT ELIGIBLE";
+        String logoDataUri = loadBankLogoDataUri();
+
+        StringBuilder documentsHtml = new StringBuilder();
+        List<String> documents = result.getRequiredDocuments() == null ? List.of() : result.getRequiredDocuments();
+        for (int i = 0; i < documents.size(); i++) {
+            documentsHtml.append("<li style=\"margin:6px 0;\">")
+                    .append(escapeHtml(documents.get(i)))
+                    .append("</li>");
+        }
+
+        StringBuilder notesHtml = new StringBuilder();
+        List<String> notes = result.getSpecialNotes() == null ? List.of() : result.getSpecialNotes();
+        for (String note : notes) {
+            notesHtml.append("<li style=\"margin:6px 0;\">")
+                    .append(escapeHtml(note))
+                    .append("</li>");
+        }
+
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset=\"UTF-8\">
+                <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+            </head>
+            <body style=\"margin:0;padding:20px;background:#f4f6f9;font-family:Arial,sans-serif;color:#1f2937;\">
+                <table width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:700px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;\">
+                    <tr>
+                        <td style=\"padding:20px;border-bottom:1px solid #e5e7eb;\">
+                            <table width=\"100%%\"><tr>
+                                <td style=\"width:72px;\"><img src=\"%s\" alt=\"Bank Simulator\" width=\"56\" height=\"56\" style=\"display:block;border-radius:8px;object-fit:contain;\"/></td>
+                                <td style=\"vertical-align:middle;\">
+                                    <h2 style=\"margin:0;font-size:22px;color:#0f172a;\">Bank Simulator</h2>
+                                    <p style=\"margin:4px 0 0;color:#475569;font-size:14px;\">Loan Eligibility Advisory</p>
+                                </td>
+                            </tr></table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style=\"padding:24px;\">
+                            <div style=\"display:inline-block;background:%s;color:#ffffff;padding:10px 16px;border-radius:999px;font-weight:700;font-size:13px;letter-spacing:.5px;\">%s</div>
+                            <p style=\"margin:18px 0 8px;font-size:15px;\"><strong>Reference Number:</strong> %s</p>
+                            <p style=\"margin:0 0 8px;font-size:15px;\"><strong>Customer:</strong> %s</p>
+                            <p style=\"margin:0 0 8px;font-size:15px;\"><strong>Eligibility Score:</strong> %s / 100</p>
+                            <p style=\"margin:0 0 20px;font-size:15px;line-height:1.6;\">%s</p>
+
+                            <h3 style=\"margin:18px 0 8px;font-size:16px;color:#0f172a;\">Documents Required</h3>
+                            <ol style=\"margin:0;padding-left:20px;line-height:1.6;\">%s</ol>
+
+                            <h3 style=\"margin:18px 0 8px;font-size:16px;color:#0f172a;\">Important Notes</h3>
+                            <ul style=\"margin:0;padding-left:20px;line-height:1.6;\">%s</ul>
+
+                            <p style=\"margin:22px 0 0;font-size:13px;color:#475569;\">This letter is valid for 30 days. Final approval is at bank discretion.</p>
+                        </td>
+                    </tr>
+                </table>
+            </body>
+            </html>
+            """.formatted(
+                logoDataUri,
+                badgeColor,
+                badgeText,
+                escapeHtml(result.getReferenceNumber()),
+                escapeHtml(result.getCustomerName()),
+                result.getEligibilityScore() != null ? result.getEligibilityScore().toPlainString() : "0",
+                escapeHtml(result.getEligibilityMessage()),
+                documentsHtml,
+                notesHtml
+        );
+    }
+
+    private String loadBankLogoDataUri() {
+        try {
+            ClassPathResource logo = new ClassPathResource("static/bank-logo.png");
+            if (logo.exists()) {
+                byte[] bytes = logo.getInputStream().readAllBytes();
+                return "data:image/png;base64," + Base64.getEncoder().encodeToString(bytes);
+            }
+        } catch (IOException ex) {
+            log.warn("Unable to load bank logo for eligibility email: {}", ex.getMessage());
+        }
+        return "https://dummyimage.com/56x56/f59e0b/ffffff.png&text=BS";
+    }
+
+    private String escapeHtml(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 
     private String resolveFromAddress() {

@@ -23,6 +23,8 @@ public class LoanResponse {
     private BigDecimal eligibilityScore;
     private BigDecimal dtiRatio;
     private String status;
+    private String referenceNumber;
+    private String eligibilityStatus;
     private BigDecimal interestRate;
     private BigDecimal emi;
     private String rejectionReason;

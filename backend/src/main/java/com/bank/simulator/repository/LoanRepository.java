@@ -17,6 +17,8 @@ public interface LoanRepository extends JpaRepository<LoanEntity, Long> {
 
     Optional<LoanEntity> findByLoanId(String loanId);
 
+    Optional<LoanEntity> findByReferenceNumber(String referenceNumber);
+
     List<LoanEntity> findAllByOrderByApplicationDateDesc();
 
     Long countByStatus(String status);

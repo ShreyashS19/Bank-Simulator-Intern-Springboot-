@@ -53,6 +53,18 @@ export const customerService = {
     }
   },
 
+  getCustomerByEmail: async (email: string): Promise<Customer> => {
+    try {
+      const response = await axios.get<ApiResponse<Customer>>(
+        `${API_BASE_URL}/customer/email/${email}`
+      );
+      return response.data.data;
+    } catch (error: any) {
+      console.error(' Error fetching customer by email:', error);
+      throw error;
+    }
+  },
+
   createCustomer: async (customer: Omit<Customer, 'customerId'>): Promise<string> => {
     try {
       const response = await axios.post<ApiResponse<string>>(

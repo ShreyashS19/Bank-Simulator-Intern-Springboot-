@@ -10,6 +10,8 @@ public interface CustomerService {
 
     CustomerResponse getCustomerByAadhar(String aadharNumber);
 
+    CustomerResponse getCustomerByEmail(String email);
+
     PageResponse<CustomerResponse> getAllCustomers(int page, int size);
 
     void updateCustomerByAadhar(String aadharNumber, UpdateCustomerRequest payload);

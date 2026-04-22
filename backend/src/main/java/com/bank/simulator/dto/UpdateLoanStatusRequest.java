@@ -8,6 +8,9 @@ import lombok.Data;
 public class UpdateLoanStatusRequest {
 
     @NotBlank(message = "Status is required")
-    @Pattern(regexp = "PENDING|APPROVED|REJECTED|UNDER_REVIEW", message = "Status must be one of: PENDING, APPROVED, REJECTED, UNDER_REVIEW")
+    @Pattern(
+            regexp = "PENDING|PENDING_BANK_REVIEW|APPROVED|REJECTED|UNDER_REVIEW|ACTIVE|CLOSED",
+            message = "Status must be one of: PENDING, PENDING_BANK_REVIEW, APPROVED, REJECTED, UNDER_REVIEW, ACTIVE, CLOSED"
+    )
     private String status;
 }

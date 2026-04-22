@@ -27,6 +27,9 @@ class LoanServiceTest {
     
     @Mock
     private NotificationService notificationService;
+
+    @Mock
+    private LoanPdfService loanPdfService;
     
     @Mock
     private AccountRepository accountRepository;
@@ -39,7 +42,14 @@ class LoanServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        loanService = new LoanService(loanRepository, creditScoringService, notificationService, accountRepository, objectMapper);
+        loanService = new LoanService(
+                loanRepository,
+                creditScoringService,
+                notificationService,
+                loanPdfService,
+                accountRepository,
+                objectMapper
+        );
     }
 
     @Test

@@ -15,7 +15,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
@@ -28,6 +32,7 @@ public class LoanService {
     private final LoanRepository loanRepository;
     private final CreditScoringService creditScoringService;
     private final NotificationService notificationService;
+    private final LoanPdfService loanPdfService;
     private final AccountRepository accountRepository;
     private final ObjectMapper objectMapper;
     
@@ -63,49 +68,31 @@ public class LoanService {
      * Requirements: 1.1, 1.2, 1.9, 1.10, 18.1, 18.2, 18.3, 18.4, 18.5, 27.2, 27.3
      */
     @Transactional
-    public LoanResponse applyForLoan(LoanApplicationRequest request, String accountNumber) {
+    public LoanEligibilityResultDto applyForLoan(LoanApplicationRequest request, String accountNumber) {
         log.info("Processing loan application for account: {}", accountNumber);
-        
-        // 1. Generate unique loan ID
+
         String loanId = generateLoanId();
-        log.info("Generated loan ID: {}", loanId);
-        
-        // 2. Call CreditScoringService to calculate credit score
+        String referenceNumber = generateReferenceNumber();
+        log.info("Generated loan id {} and reference number {}", loanId, referenceNumber);
+
         CreditScoreResult scoreResult = creditScoringService.calculateCreditScore(request, accountNumber);
-        log.info("Credit score calculated. Eligibility score: {}", scoreResult.getEligibilityScore());
-        
-        // 3. Determine loan status using decision logic
-        String status = determineStatus(scoreResult.getEligibilityScore().doubleValue(), scoreResult.getDtiRatio());
-        log.info("Loan status determined: {}", status);
-        
-        // 4. Assign interest rate based on eligibility score
-        BigDecimal interestRate = assignInterestRate(scoreResult.getEligibilityScore().doubleValue(), status);
-        log.info("Interest rate assigned: {}%", interestRate);
-        
-        // 5. Calculate EMI for approved/under review loans
-        BigDecimal emi = BigDecimal.ZERO;
-        if ("APPROVED".equals(status) || "UNDER_REVIEW".equals(status)) {
-            emi = calculateEmi(request.getLoanAmount(), interestRate, request.getLoanTenure());
-            log.info("EMI calculated: {}", emi);
-        }
-        
-        // 6. Generate rejection reason if rejected
-        String rejectionReason = generateRejectionReason(scoreResult, status);
-        
-        // 7. Generate improvement tips
-        List<String> improvementTips = generateImprovementTips(scoreResult, status);
-        log.info("Generated {} improvement tips", improvementTips.size());
-        
-        // 8. Convert improvementTips list to JSON string for storage
-        String improvementTipsJson = "";
+        BigDecimal eligibilityScore = scoreResult.getEligibilityScore();
+        String eligibilityStatus = eligibilityScore.compareTo(BigDecimal.valueOf(65.0)) >= 0
+                ? "ELIGIBLE"
+                : "NOT_ELIGIBLE";
+
+        String advisoryStatus = determineStatus(eligibilityScore.doubleValue(), scoreResult.getDtiRatio());
+        String rejectionReason = generateRejectionReason(scoreResult, advisoryStatus);
+        List<String> improvementTips = generateImprovementTips(scoreResult, advisoryStatus);
+
+        String improvementTipsJson;
         try {
             improvementTipsJson = objectMapper.writeValueAsString(improvementTips);
-        } catch (JsonProcessingException e) {
-            log.error("Error converting improvement tips to JSON", e);
+        } catch (JsonProcessingException ex) {
+            log.error("Error converting improvement tips to JSON", ex);
             improvementTipsJson = "[]";
         }
-        
-        // 9. Create LoanEntity and populate all fields
+
         LoanEntity loanEntity = LoanEntity.builder()
                 .loanId(loanId)
                 .accountNumber(accountNumber)
@@ -133,90 +120,168 @@ public class LoanService {
                 .residenceScore(scoreResult.getResidenceScore())
                 .loanPurposeScore(scoreResult.getLoanPurposeScore())
                 .guarantorScore(scoreResult.getGuarantorScore())
-                .eligibilityScore(scoreResult.getEligibilityScore())
+                .creditScorePoints(scoreResult.getCreditScorePoints())
+                .loanToIncomeScore(scoreResult.getLoanToIncomeScore())
+                .tenureScore(scoreResult.getTenureScore())
+                .eligibilityScore(eligibilityScore)
                 .dtiRatio(scoreResult.getDtiRatio())
-                .status(status)
-                .interestRate(interestRate)
-                .emi(emi)
+                .status("PENDING_BANK_REVIEW")
+                .referenceNumber(referenceNumber)
+                .eligibilityStatus(eligibilityStatus)
+                .interestRate(BigDecimal.ZERO)
+                .emi(BigDecimal.ZERO)
                 .rejectionReason(rejectionReason)
                 .improvementTips(improvementTipsJson)
                 .build();
-        
-        // 10. Save to database
+
         LoanEntity savedEntity = loanRepository.save(loanEntity);
-        log.info("Loan application saved to database with ID: {}", savedEntity.getId());
-        
-        // 11. Send email notification (handle failures gracefully)
+        log.info("Loan advisory saved with id {} and reference {}", savedEntity.getId(), referenceNumber);
+
+        AccountEntity accountEntity = accountRepository.findByAccountNumberWithCustomer(accountNumber)
+                .orElseThrow(() -> new BusinessException("Account not found for account number: " + accountNumber));
+
+        LoanEligibilityResultDto result = buildEligibilityResultFromLoan(savedEntity, accountEntity);
+
         try {
-            String emailSubject = "Loan Application Status - " + loanId;
-            String emailBody = buildEmailBody(loanId, status, scoreResult.getEligibilityScore(), 
-                    request.getLoanAmount(), interestRate, emi, rejectionReason, improvementTips);
-            
-            // Retrieve customer email from account repository
-            Optional<String> customerEmailOpt = accountRepository.findCustomerEmailByAccountNumber(accountNumber);
-            if (customerEmailOpt.isPresent()) {
-                String customerEmail = customerEmailOpt.get();
-                boolean sent = notificationService.sendNotification(customerEmail, emailSubject, emailBody);
-                if (sent) {
-                    log.info("Email notification sent successfully for loan {}", loanId);
-                } else {
-                    log.warn("Failed to send email notification for loan {}", loanId);
-                }
-            } else {
-                log.warn("Customer email not found for account {}", accountNumber);
-            }
-        } catch (Exception e) {
-            log.error("Failed to send email notification for loan {}: {}", loanId, e.getMessage());
-            // Don't fail the application if email fails
+            notificationService.sendEligibilityResultEmail(result);
+        } catch (Exception ex) {
+            log.error("Failed to send eligibility email for reference {}", referenceNumber, ex);
         }
-        
-        // 12. Convert entity to LoanResponse DTO and return
-        return convertToLoanResponse(savedEntity);
+
+        try {
+            loanPdfService.generateEligibilityPdf(result);
+        } catch (Exception ex) {
+            log.warn("Could not pre-generate eligibility PDF for reference {}: {}", referenceNumber, ex.getMessage());
+        }
+
+        return result;
     }
-    
-    /**
-     * Build email body for loan application notification
-     */
-    private String buildEmailBody(String loanId, String status, BigDecimal eligibilityScore,
-                                   BigDecimal loanAmount, BigDecimal interestRate, BigDecimal emi,
-                                   String rejectionReason, List<String> improvementTips) {
-        StringBuilder body = new StringBuilder();
-        body.append("Dear Customer,\n\n");
-        body.append("Your loan application (").append(loanId).append(") has been processed.\n\n");
-        body.append("Status: ").append(status).append("\n");
-        body.append("Eligibility Score: ").append(eligibilityScore).append("\n\n");
-        
-        if ("APPROVED".equals(status)) {
-            body.append("Congratulations! Your loan has been approved.\n\n");
-            body.append("Approved Amount: ").append(loanAmount).append(" INR\n");
-            body.append("Interest Rate: ").append(interestRate).append("%\n");
-            body.append("Monthly EMI: ").append(emi).append(" INR\n");
-        } else if ("REJECTED".equals(status)) {
-            body.append("Unfortunately, your loan application has been rejected.\n\n");
-            body.append("Reason: ").append(rejectionReason).append("\n\n");
-            if (!improvementTips.isEmpty()) {
-                body.append("Improvement Tips:\n");
-                for (String tip : improvementTips) {
-                    body.append("- ").append(tip).append("\n");
-                }
+
+    public LoanEligibilityResultDto getEligibilityResultByReferenceNumber(String referenceNumber) {
+        LoanEntity loanEntity = loanRepository.findByReferenceNumber(referenceNumber)
+                .orElseThrow(() -> new BusinessException("Loan not found for reference number: " + referenceNumber));
+
+        AccountEntity accountEntity = accountRepository.findByAccountNumberWithCustomer(loanEntity.getAccountNumber())
+                .orElseThrow(() -> new BusinessException("Account not found for account number: " + loanEntity.getAccountNumber()));
+
+        return buildEligibilityResultFromLoan(loanEntity, accountEntity);
+    }
+
+    private LoanEligibilityResultDto buildEligibilityResultFromLoan(LoanEntity loanEntity, AccountEntity accountEntity) {
+        String customerName = accountEntity.getCustomer() != null ? accountEntity.getCustomer().getName() : "Customer";
+        String customerEmail = accountEntity.getCustomer() != null
+                ? accountEntity.getCustomer().getEmail()
+                : accountRepository.findCustomerEmailByAccountNumber(loanEntity.getAccountNumber()).orElse("");
+
+        String eligibilityStatus = loanEntity.getEligibilityStatus() != null
+                ? loanEntity.getEligibilityStatus()
+                : (loanEntity.getEligibilityScore().compareTo(BigDecimal.valueOf(65.0)) >= 0 ? "ELIGIBLE" : "NOT_ELIGIBLE");
+
+        List<String> improvementTips = List.of();
+        try {
+            if (loanEntity.getImprovementTips() != null && !loanEntity.getImprovementTips().isEmpty()) {
+                improvementTips = objectMapper.readValue(loanEntity.getImprovementTips(), 
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
             }
-        } else if ("UNDER_REVIEW".equals(status)) {
-            body.append("Your loan application is under review.\n\n");
-            body.append("Requested Amount: ").append(loanAmount).append(" INR\n");
-            body.append("Estimated Interest Rate: ").append(interestRate).append("%\n");
-            body.append("Estimated Monthly EMI: ").append(emi).append(" INR\n");
-            if (!improvementTips.isEmpty()) {
-                body.append("\nSuggestions for improvement:\n");
-                for (String tip : improvementTips) {
-                    body.append("- ").append(tip).append("\n");
-                }
+        } catch (JsonProcessingException e) {
+            log.error("Error parsing improvement tips JSON", e);
+        }
+
+        return LoanEligibilityResultDto.builder()
+                .referenceNumber(loanEntity.getReferenceNumber())
+                .eligibilityStatus(eligibilityStatus)
+                .customerName(customerName)
+                .customerEmail(customerEmail)
+                .loanAmount(loanEntity.getLoanAmount())
+                .loanPurpose(loanEntity.getLoanPurpose())
+                .loanTenure(loanEntity.getLoanTenure())
+                .eligibilityScore(loanEntity.getEligibilityScore())
+                .eligibilityMessage(buildEligibilityMessage(eligibilityStatus, loanEntity.getEligibilityScore()))
+                .requiredDocuments(buildRequiredDocuments(loanEntity.getLoanPurpose()))
+                .specialNotes(buildSpecialNotes(loanEntity.getReferenceNumber()))
+                .improvementTips(improvementTips)
+                .generatedAt(loanEntity.getApplicationDate() != null ? loanEntity.getApplicationDate() : LocalDateTime.now())
+                .pdfDownloadPath("/loan/pdf/" + loanEntity.getReferenceNumber())
+                .build();
+    }
+
+    private String generateReferenceNumber() {
+        String characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        int maxRetries = 5;
+
+        for (int attempt = 0; attempt < maxRetries; attempt++) {
+            StringBuilder suffix = new StringBuilder(6);
+            for (int i = 0; i < 6; i++) {
+                suffix.append(characters.charAt(random.nextInt(characters.length())));
+            }
+
+            String referenceNumber = "LN-" + LocalDate.now().getYear() + "-" + suffix;
+            if (loanRepository.findByReferenceNumber(referenceNumber).isEmpty()) {
+                return referenceNumber;
             }
         }
-        
-        body.append("\nThank you for choosing our bank.\n");
-        body.append("Best regards,\nLoan Department");
-        
-        return body.toString();
+
+        throw new BusinessException("Failed to generate unique reference number");
+    }
+
+    private String buildEligibilityMessage(String eligibilityStatus, BigDecimal eligibilityScore) {
+        String scoreText = eligibilityScore != null ? eligibilityScore.toPlainString() : "0";
+        if ("ELIGIBLE".equalsIgnoreCase(eligibilityStatus)) {
+            return "Your profile cleared our preliminary eligibility checks with score " + scoreText
+                    + ". Final approval and final terms will be confirmed by a bank officer after document verification.";
+        }
+        return "Your profile currently falls below the preferred threshold (score " + scoreText
+                + "). You may still visit the branch with all documents for manual review and final decision.";
+    }
+
+    private List<String> buildRequiredDocuments(String loanPurpose) {
+        List<String> documents = new ArrayList<>(List.of(
+                "Aadhaar Card (original + 2 photocopies)",
+                "PAN Card (original + 2 photocopies)",
+                "Recent passport-size photographs (4 copies)",
+                "Last 6 months bank statement",
+                "Income proof (salary slips last 3 months OR ITR last 2 years)"
+        ));
+
+        String purpose = loanPurpose == null ? "" : loanPurpose.toUpperCase(Locale.ROOT);
+        switch (purpose) {
+            case "HOME", "HOME_LOAN" -> documents.addAll(List.of(
+                    "Property documents / Sale deed",
+                    "NOC from builder or society",
+                    "Approved building plan copy",
+                    "Property tax receipt"
+            ));
+            case "PERSONAL", "PERSONAL_LOAN" -> documents.addAll(List.of(
+                    "Employment proof (offer letter or ID card)",
+                    "Last 3 months salary slips"
+            ));
+            case "BUSINESS", "BUSINESS_LOAN" -> documents.addAll(List.of(
+                    "Business registration certificate",
+                    "GST registration certificate",
+                    "Last 2 years business ITR",
+                    "Balance sheet and P&L statement"
+            ));
+            case "EDUCATION", "EDUCATION_LOAN" -> documents.addAll(List.of(
+                    "Admission letter from institution",
+                    "Fee structure document",
+                    "Institution accreditation proof"
+            ));
+            default -> {
+                // Keep common documents only for unmatched purpose values.
+            }
+        }
+
+        return documents;
+    }
+
+    private List<String> buildSpecialNotes(String referenceNumber) {
+        String safeReference = referenceNumber == null ? "N/A" : referenceNumber;
+        return List.of(
+                "This is a PRELIMINARY check only.",
+                "Final approval is at bank discretion after physical verification.",
+                "This advisory is valid for 30 days from issue date.",
+                "Quote reference number " + safeReference + " at the branch."
+        );
     }
     
     /**
@@ -247,6 +312,9 @@ public class LoanService {
                 .residenceScore(entity.getResidenceScore())
                 .loanPurposeScore(entity.getLoanPurposeScore())
                 .guarantorScore(entity.getGuarantorScore())
+                .creditScorePoints(entity.getCreditScorePoints())
+                .loanToIncomeScore(entity.getLoanToIncomeScore())
+                .tenureScore(entity.getTenureScore())
                 .build();
         
         return LoanResponse.builder()
@@ -258,6 +326,8 @@ public class LoanService {
                 .eligibilityScore(entity.getEligibilityScore())
                 .dtiRatio(entity.getDtiRatio())
                 .status(entity.getStatus())
+                .referenceNumber(entity.getReferenceNumber())
+                .eligibilityStatus(entity.getEligibilityStatus())
                 .interestRate(entity.getInterestRate())
                 .emi(entity.getEmi())
                 .rejectionReason(entity.getRejectionReason())
@@ -620,7 +690,8 @@ public class LoanService {
         Long approvedCount = loanRepository.countByStatus("APPROVED");
         Long rejectedCount = loanRepository.countByStatus("REJECTED");
         Long underReviewCount = loanRepository.countByStatus("UNDER_REVIEW");
-        Long pendingCount = loanRepository.countByStatus("PENDING");
+        Long pendingCount = loanRepository.countByStatus("PENDING")
+            + loanRepository.countByStatus("PENDING_BANK_REVIEW");
         
         // Calculate total approved amount
         BigDecimal totalApprovedAmount = loanRepository.sumLoanAmountByStatus("APPROVED");

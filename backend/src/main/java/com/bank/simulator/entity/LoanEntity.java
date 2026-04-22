@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 }, indexes = {
     @Index(name = "idx_account_number", columnList = "account_number"),
     @Index(name = "idx_status", columnList = "status"),
+    @Index(name = "idx_reference_number", columnList = "reference_number"),
     @Index(name = "idx_application_date", columnList = "application_date")
 })
 @Getter
@@ -107,6 +108,15 @@ public class LoanEntity {
     @Column(name = "guarantor_score", nullable = false)
     private Double guarantorScore;
 
+    @Column(name = "credit_score_points", nullable = false)
+    private Double creditScorePoints;
+
+    @Column(name = "loan_to_income_score", nullable = false)
+    private Double loanToIncomeScore;
+
+    @Column(name = "tenure_score", nullable = false)
+    private Double tenureScore;
+
     @Column(name = "eligibility_score", nullable = false, precision = 5, scale = 2)
     private BigDecimal eligibilityScore;
 
@@ -115,6 +125,12 @@ public class LoanEntity {
 
     @Column(name = "status", nullable = false, length = 20)
     private String status;
+
+    @Column(name = "reference_number", length = 30)
+    private String referenceNumber;
+
+    @Column(name = "eligibility_status", length = 20)
+    private String eligibilityStatus;
 
     @Column(name = "interest_rate", nullable = false, precision = 5, scale = 2)
     private BigDecimal interestRate;

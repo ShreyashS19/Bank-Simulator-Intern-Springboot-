@@ -1,6 +1,6 @@
 import axios from '../utils/axiosConfig';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/bank-simulator/api';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/bank-simulator/api';
 
 export interface LoanApplicationRequest {
   loanAmount: number;
@@ -41,6 +41,8 @@ export interface LoanResponse {
   eligibilityScore: number;
   dtiRatio: number;
   status: string;
+  referenceNumber?: string;
+  eligibilityStatus?: 'ELIGIBLE' | 'NOT_ELIGIBLE';
   interestRate: number;
   emi: number;
   rejectionReason: string;
@@ -48,6 +50,23 @@ export interface LoanResponse {
   applicationDate: string;
   lastUpdated: string;
   factorScores: FactorScores;
+}
+
+export interface LoanEligibilityResultDto {
+  referenceNumber: string;
+  eligibilityStatus: 'ELIGIBLE' | 'NOT_ELIGIBLE';
+  customerName: string;
+  customerEmail: string;
+  loanAmount: number;
+  loanPurpose: string;
+  loanTenure: number;
+  eligibilityScore: number;
+  eligibilityMessage: string;
+  requiredDocuments: string[];
+  specialNotes: string[];
+  improvementTips?: string[];
+  generatedAt: string;
+  pdfDownloadPath: string;
 }
 
 export interface LoanStatistics {
@@ -72,9 +91,9 @@ export interface ApiResponse<T> {
 }
 
 export const loanService = {
-  applyForLoan: async (request: LoanApplicationRequest): Promise<LoanResponse> => {
+  applyForLoan: async (request: LoanApplicationRequest): Promise<LoanEligibilityResultDto> => {
     try {
-      const response = await axios.post<ApiResponse<LoanResponse>>(
+      const response = await axios.post<ApiResponse<LoanEligibilityResultDto>>(
         `${API_BASE_URL}/loan/apply`,
         request,
         {

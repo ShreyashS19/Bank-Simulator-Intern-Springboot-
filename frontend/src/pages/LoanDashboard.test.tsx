@@ -142,7 +142,7 @@ describe('LoanDashboard', () => {
     });
 
     // Mock customerService
-    vi.mocked(customerService.getCustomerByAadhar).mockResolvedValue({
+    vi.mocked(customerService.getCustomerByEmail).mockResolvedValue({
       customerId: 'CUST123',
       name: 'Test User',
       phoneNumber: '1234567890',

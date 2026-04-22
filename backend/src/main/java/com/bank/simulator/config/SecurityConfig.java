@@ -89,7 +89,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PUT, "/loan/*/status").hasRole("ADMIN")
                 // Loan endpoints - Authenticated users
                 .requestMatchers(HttpMethod.POST, "/loan/apply").authenticated()
-                .requestMatchers(HttpMethod.GET, "/loan/account/**", "/loan/*").authenticated()
+                .requestMatchers(HttpMethod.GET, "/loan/pdf/**", "/loan/account/**", "/loan/*").authenticated()
                 // All other requests require authentication
                 .anyRequest().authenticated()
             )

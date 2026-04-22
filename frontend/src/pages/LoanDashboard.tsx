@@ -4,13 +4,16 @@ import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, TrendingUp, DollarSign, Percent, FileText, AlertCircle, Sparkles, Activity } from 'lucide-react';
+import { Loader2, TrendingUp, DollarSign, Percent, FileText, AlertCircle, Sparkles, Activity, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, Legend, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
-import { loanService, LoanResponse } from '@/services/loanService';
+import { API_BASE_URL, loanService, LoanResponse } from '@/services/loanService';
 import { customerService } from '@/services/customerService';
 import { accountService } from '@/services/accountService';
 import { tokenUtils } from '@/services/authService';
+import axios from '@/utils/axiosConfig';
+import { toast } from 'sonner';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
 
@@ -34,7 +37,7 @@ const LoanDashboard = () => {
         return;
       }
 
-      const customer = await customerService.getCustomerByAadhar(user.email);
+      const customer = await customerService.getCustomerByEmail(user.email);
       const allAccounts = await accountService.getAllAccounts();
       const userAccount = allAccounts.find(acc => acc.aadharNumber === customer.aadharNumber);
       
@@ -76,6 +79,7 @@ const LoanDashboard = () => {
   }
 
   const latestLoan = loans.length > 0 ? loans[0] : null;
+  const pendingBankReviewLoan = loans.find((loan) => loan.status === 'PENDING_BANK_REVIEW');
   const activeLoans = loans.filter(loan => loan.status === 'APPROVED').length;
 
   const maxLoanEligibility = latestLoan 
@@ -106,7 +110,10 @@ const LoanDashboard = () => {
 
   const pieData = [
     { name: 'Approved', value: statusCounts['APPROVED'] || 0 },
-    { name: 'Pending', value: statusCounts['UNDER_REVIEW'] || statusCounts['PENDING'] || 0 },
+    {
+      name: 'Pending',
+      value: (statusCounts['UNDER_REVIEW'] || 0) + (statusCounts['PENDING'] || 0) + (statusCounts['PENDING_BANK_REVIEW'] || 0),
+    },
     { name: 'Rejected', value: statusCounts['REJECTED'] || 0 },
   ].filter(d => d.value > 0);
   
@@ -176,6 +183,49 @@ const LoanDashboard = () => {
             icon={<FileText className="h-5 w-5 text-purple-500" />}
           />
         </motion.div>
+
+        {pendingBankReviewLoan && (
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.45 } } }}
+          >
+            <Card className="border-blue-200 bg-blue-50/70">
+              <CardContent className="pt-6">
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold text-blue-900">Your eligibility has been assessed.</h3>
+                  <p className="text-blue-900">Reference Number: <span className="font-semibold">{pendingBankReviewLoan.referenceNumber || 'N/A'}</span></p>
+                  <p className="text-sm text-blue-900">Please visit the bank with your reference number and required documents.</p>
+                  <p className="text-sm text-blue-900">Final loan decision will be updated here once bank processes your application.</p>
+                  {pendingBankReviewLoan.referenceNumber && (
+                    <Button
+                      className="mt-1"
+                      onClick={async () => {
+                        try {
+                          const response = await axios.get(
+                            `${API_BASE_URL}/loan/pdf/${pendingBankReviewLoan.referenceNumber}`,
+                            { responseType: 'blob' }
+                          );
+                          const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.setAttribute('download', `eligibility-${pendingBankReviewLoan.referenceNumber}.pdf`);
+                          document.body.appendChild(link);
+                          link.click();
+                          link.remove();
+                          window.URL.revokeObjectURL(url);
+                        } catch {
+                          toast.error('Failed to download PDF. Please try again.');
+                        }
+                      }}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download PDF Letter
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         {latestLoan && (
           <>
@@ -391,6 +441,7 @@ const LoanHistoryTable = ({ loans }: { loans: LoanResponse[] }) => {
       REJECTED: 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/20',
       UNDER_REVIEW: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20',
       PENDING: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20',
+      PENDING_BANK_REVIEW: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20',
     };
     return (
       <Badge variant="outline" className={`rounded-full px-3 py-1 ${variants[status] || ''}`}>

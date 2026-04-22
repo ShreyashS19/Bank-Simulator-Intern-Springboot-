@@ -233,14 +233,15 @@ interface LoanManagementTableProps {
 
 const LoanManagementTable = ({ loans, onStatusUpdate, updatingLoanId }: LoanManagementTableProps) => {
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-      APPROVED: 'default',
-      REJECTED: 'destructive',
-      UNDER_REVIEW: 'secondary',
-      PENDING: 'outline',
+    const badgeClasses: Record<string, string> = {
+      APPROVED: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      REJECTED: 'bg-red-100 text-red-800 border-red-200',
+      UNDER_REVIEW: 'bg-amber-100 text-amber-800 border-amber-200',
+      PENDING: 'bg-slate-100 text-slate-800 border-slate-200',
+      PENDING_BANK_REVIEW: 'bg-blue-100 text-blue-800 border-blue-200',
     };
     return (
-      <Badge variant={variants[status] || 'outline'}>
+      <Badge variant="outline" className={badgeClasses[status] || 'bg-slate-100 text-slate-800 border-slate-200'}>
         {status.replace('_', ' ')}
       </Badge>
     );
@@ -261,6 +262,7 @@ const LoanManagementTable = ({ loans, onStatusUpdate, updatingLoanId }: LoanMana
               <TableHeader>
                 <TableRow>
                   <TableHead>Loan ID</TableHead>
+                  <TableHead>Reference No.</TableHead>
                   <TableHead>Account Number</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
@@ -274,6 +276,7 @@ const LoanManagementTable = ({ loans, onStatusUpdate, updatingLoanId }: LoanMana
                 {loans.map((loan) => (
                   <TableRow key={loan.loanId}>
                     <TableCell className="font-medium">{loan.loanId}</TableCell>
+                    <TableCell className="font-mono text-xs">{loan.referenceNumber || '—'}</TableCell>
                     <TableCell className="font-mono text-sm">{loan.accountNumber}</TableCell>
                     <TableCell>₹{loan.loanAmount.toLocaleString()}</TableCell>
                     <TableCell>{getStatusBadge(loan.status)}</TableCell>
@@ -294,6 +297,7 @@ const LoanManagementTable = ({ loans, onStatusUpdate, updatingLoanId }: LoanMana
                           )}
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="PENDING_BANK_REVIEW">Pending Bank Review</SelectItem>
                           <SelectItem value="PENDING">Pending</SelectItem>
                           <SelectItem value="APPROVED">Approved</SelectItem>
                           <SelectItem value="REJECTED">Rejected</SelectItem>
@@ -378,6 +382,7 @@ const LoanStatusByMonthChart = ({ data }: LoanStatusByMonthChartProps) => (
             <Line type="monotone" dataKey="APPROVED" stroke="#22c55e" strokeWidth={2} />
             <Line type="monotone" dataKey="REJECTED" stroke="#ef4444" strokeWidth={2} />
             <Line type="monotone" dataKey="UNDER_REVIEW" stroke="#eab308" strokeWidth={2} />
+            <Line type="monotone" dataKey="PENDING_BANK_REVIEW" stroke="#3b82f6" strokeWidth={2} />
             <Line type="monotone" dataKey="PENDING" stroke="#3b82f6" strokeWidth={2} />
           </LineChart>
         </ResponsiveContainer>

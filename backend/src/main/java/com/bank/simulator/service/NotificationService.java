@@ -1,5 +1,7 @@
 package com.bank.simulator.service;
 
+import com.bank.simulator.dto.LoanEligibilityResultDto;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -35,7 +37,9 @@ public interface NotificationService {
             BigDecimal amount,
             String transactionId);
 
-    boolean sendNotification(String toEmail, String subject, String body);
+        boolean sendNotification(String toEmail, String subject, String body);
+
+        void sendEligibilityResultEmail(LoanEligibilityResultDto result);
 
     // ─── OTP & Reset Emails ───────────────────────────────────────────────────
 

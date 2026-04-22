@@ -24,6 +24,7 @@ class LoanServicePropertyTest {
     private final LoanRepository mockLoanRepository = Mockito.mock(LoanRepository.class);
     private final CreditScoringService mockCreditScoringService = Mockito.mock(CreditScoringService.class);
     private final NotificationService mockNotificationService = Mockito.mock(NotificationService.class);
+    private final LoanPdfService mockLoanPdfService = Mockito.mock(LoanPdfService.class);
     private final AccountRepository mockAccountRepository = Mockito.mock(AccountRepository.class);
     private final ObjectMapper mockObjectMapper = Mockito.mock(ObjectMapper.class);
     
@@ -32,6 +33,7 @@ class LoanServicePropertyTest {
             mockLoanRepository, 
             mockCreditScoringService, 
             mockNotificationService,
+            mockLoanPdfService,
             mockAccountRepository,
             mockObjectMapper
     );

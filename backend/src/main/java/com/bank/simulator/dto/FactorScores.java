@@ -22,4 +22,7 @@ public class FactorScores {
     private Double residenceScore;
     private Double loanPurposeScore;
     private Double guarantorScore;
+    private Double creditScorePoints;
+    private Double loanToIncomeScore;
+    private Double tenureScore;
 }

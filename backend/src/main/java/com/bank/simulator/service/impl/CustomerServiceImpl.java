@@ -88,6 +88,15 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
+    public CustomerResponse getCustomerByEmail(String email) {
+        CustomerEntity customer = customerRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException(
+                    "Customer not found with Email: " + email, HttpStatus.NOT_FOUND));
+
+        return toResponse(customer);
+    }
+
+    @Override
     public PageResponse<CustomerResponse> getAllCustomers(int page, int size) {
         int normalizedPage = Math.max(page, 0);
         int normalizedSize = size > 0 ? size : 20;

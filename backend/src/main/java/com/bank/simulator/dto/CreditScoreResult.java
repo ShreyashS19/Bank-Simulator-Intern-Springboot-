@@ -24,6 +24,9 @@ public class CreditScoreResult {
     private Double residenceScore;
     private Double loanPurposeScore;
     private Double guarantorScore;
+    private Double creditScorePoints;      // CIBIL score factor (max 150)
+    private Double loanToIncomeScore;      // Loan amount vs annual income (max 60)
+    private Double tenureScore;            // Loan tenure risk factor (max 30)
     private BigDecimal eligibilityScore;
     private BigDecimal dtiRatio;
 }

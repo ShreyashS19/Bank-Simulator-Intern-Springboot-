@@ -374,6 +374,7 @@
 //   </div>
 // );
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -382,9 +383,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { loanService, LoanApplicationRequest, LoanResponse } from '@/services/loanService';
-import { Loader2, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight, DollarSign, Wallet, Briefcase, Activity, Target } from 'lucide-react';
-import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import { loanService, LoanApplicationRequest, LoanEligibilityResultDto } from '@/services/loanService';
+import { Loader2, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight, DollarSign, Wallet, Briefcase, Target, HelpCircle } from 'lucide-react';
+import LoanEligibilityResultCard from '@/components/LoanEligibilityResultCard';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 type FormData = LoanApplicationRequest;
 interface FormErrors { [key: string]: string; }
@@ -396,9 +398,11 @@ const slideVariants: Variants = {
 };
 
 export const LoanApplicationForm = () => {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<LoanResponse | null>(null);
+  const [isCreditScoreModalOpen, setIsCreditScoreModalOpen] = useState(false);
+  const [eligibilityResult, setEligibilityResult] = useState<LoanEligibilityResultDto | null>(null);
   const [error, setError] = useState<string>('');
   
   const [formData, setFormData] = useState<FormData>({
@@ -414,13 +418,13 @@ export const LoanApplicationForm = () => {
     if (step === 1) {
       if (!formData.age || formData.age < 18 || formData.age > 70) newErrors.age = 'Age must be between 18 and 70';
       if (!formData.employmentType) newErrors.employmentType = 'Required';
-      if (formData.residenceYears < 0) newErrors.residenceYears = 'Invalid years';
+      if (formData.residenceYears < 0 || formData.residenceYears === ('' as any)) newErrors.residenceYears = 'Must be 0 or more';
     }
     if (step === 2) {
       if (!formData.monthlyIncome || formData.monthlyIncome <= 0) newErrors.monthlyIncome = 'Must be > 0';
-      if (formData.existingEmi < 0) newErrors.existingEmi = 'Invalid EMI';
+      if (formData.existingEmi < 0 || formData.existingEmi === ('' as any)) newErrors.existingEmi = 'Must be 0 or more';
       if (!formData.creditScore || formData.creditScore < 300 || formData.creditScore > 900) newErrors.creditScore = '300-900 only';
-      if (formData.existingLoans < 0) newErrors.existingLoans = 'Invalid loans';
+      if (formData.existingLoans < 0 || formData.existingLoans === ('' as any)) newErrors.existingLoans = 'Must be 0 or more';
       if (!formData.repaymentHistory) newErrors.repaymentHistory = 'Required';
     }
     if (step === 3) {
@@ -433,15 +437,22 @@ export const LoanApplicationForm = () => {
   };
 
   const handleNext = () => { if (validateStep(currentStep)) setCurrentStep(currentStep + 1); };
-  const handlePrevious = () => { setCurrentStep(currentStep - 1); setErrors({}); };
+  const handlePrevious = () => { 
+    if (currentStep === 1) {
+      navigate('/loans');
+      return;
+    }
+    setCurrentStep(currentStep - 1); 
+    setErrors({}); 
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateStep(3)) return;
-    setIsLoading(true); setError(''); setResult(null);
+    setIsLoading(true); setError(''); setEligibilityResult(null);
     try {
       const response = await loanService.applyForLoan(formData);
-      setResult(response);
+      setEligibilityResult(response);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to submit application.');
     } finally {
@@ -450,7 +461,7 @@ export const LoanApplicationForm = () => {
   };
 
   const resetForm = () => {
-    setCurrentStep(1); setResult(null); setError(''); setErrors({});
+    setCurrentStep(1); setEligibilityResult(null); setError(''); setErrors({});
     setFormData({ age: 0, employmentType: '', residenceYears: 0, hasGuarantor: false, monthlyIncome: 0, existingEmi: 0, creditScore: 0, existingLoans: 0, hasCollateral: false, repaymentHistory: '', loanAmount: 0, loanPurpose: '', loanTenure: 0 });
   };
 
@@ -471,11 +482,13 @@ export const LoanApplicationForm = () => {
           return (
             <div key={step} className="flex flex-col items-center">
               <motion.div 
-                animate={{ 
-                  scale: isActive ? 1.2 : 1,
-                  backgroundColor: isActive || isCompleted ? 'hsl(var(--primary))' : 'hsl(var(--muted))'
-                }}
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-lg transition-colors ${isActive || isCompleted ? 'text-primary-foreground' : 'text-muted-foreground'}`}
+                animate={{ scale: isActive ? 1.2 : 1 }}
+                transition={{ duration: 0.2 }}
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-lg transition-colors duration-300
+                  ${isActive || isCompleted
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground'
+                  }`}
               >
                 {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : step}
               </motion.div>
@@ -489,74 +502,11 @@ export const LoanApplicationForm = () => {
     </div>
   );
 
-  if (result) {
+  if (eligibilityResult) {
     return (
-      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="max-w-2xl mx-auto p-4 md:p-8">
-        <Card className="glass-card overflow-hidden border-0 relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent"></div>
-          <CardContent className="p-8 relative z-10 text-center">
-            
-            {result.status === 'APPROVED' ? (
-              <div className="w-48 h-48 mx-auto -mt-6">
-                <DotLottieReact
-                  src="https://lottie.host/79075727-8d07-477d-ba32-474bd634e9e0/A3lS6XU3T3.lottie"
-                  loop={false}
-                  autoplay
-                />
-              </div>
-            ) : (
-              <div className="mx-auto w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center mb-6">
-                <AlertCircle className="w-10 h-10 text-amber-500" />
-              </div>
-            )}
-            
-            <h2 className={`text-4xl font-extrabold tracking-tight mt-2 ${result.status === 'APPROVED' ? 'text-emerald-500' : result.status === 'REJECTED' ? 'text-red-500' : 'text-amber-500'}`}>
-              {result.status.replace('_', ' ')}
-            </h2>
-            <p className="text-muted-foreground mt-2 text-lg">Application ID: {result.loanId}</p>
-
-            <div className="mt-8 grid grid-cols-2 gap-4 text-left">
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 glass-panel">
-                <p className="text-muted-foreground text-sm font-medium">Eligibility Score</p>
-                <p className="text-2xl font-bold text-foreground mt-1">{result.eligibilityScore.toFixed(0)}%</p>
-              </div>
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 glass-panel">
-                <p className="text-muted-foreground text-sm font-medium">Amount</p>
-                <p className="text-2xl font-bold text-foreground mt-1">₹{result.loanAmount.toLocaleString()}</p>
-              </div>
-              {result.status !== 'REJECTED' && (
-                <>
-                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 glass-panel">
-                    <p className="text-muted-foreground text-sm font-medium">EMI Estimate</p>
-                    <p className="text-2xl font-bold text-primary mt-1">₹{result.emi.toLocaleString()}</p>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 glass-panel">
-                    <p className="text-muted-foreground text-sm font-medium">Interest Rate</p>
-                    <p className="text-2xl font-bold text-foreground mt-1">{result.interestRate}%</p>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {result.improvementTips && result.improvementTips.length > 0 && (
-              <div className="mt-8 text-left p-6 rounded-2xl bg-black/5 dark:bg-white/5 border border-white/10">
-                <h4 className="font-semibold text-foreground flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-primary"/> AI Review Tips
-                </h4>
-                <ul className="mt-3 space-y-2">
-                  {result.improvementTips.map((tip, i) => (
-                    <li key={i} className="text-sm border-l-2 border-primary/40 pl-3 text-muted-foreground">{tip}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <Button onClick={resetForm} className="mt-8 w-full md:w-auto px-8 rounded-full h-12 text-md shadow-lg shadow-primary/20 transition-all hover:scale-105">
-              Back to Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      </motion.div>
+      <div className="max-w-5xl mx-auto p-4 md:p-8">
+        <LoanEligibilityResultCard result={eligibilityResult} onApplyAgain={resetForm} />
+      </div>
     );
   }
 
@@ -624,7 +574,7 @@ export const LoanApplicationForm = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                     <InputField id="monthlyIncome" label="Monthly Income (₹)" type="number" value={formData.monthlyIncome} onChange={(v: number) => setFormData({...formData, monthlyIncome: v})} error={errors.monthlyIncome} placeholder="e.g. 85000" />
                     <InputField id="existingEmi" label="Existing EMI (₹)" type="number" value={formData.existingEmi} onChange={(v: number) => setFormData({...formData, existingEmi: v})} error={errors.existingEmi} placeholder="e.g. 15000" />
-                    <InputField id="creditScore" label="Credit Score" type="number" value={formData.creditScore} onChange={(v: number) => setFormData({...formData, creditScore: v})} error={errors.creditScore} placeholder="300-900" />
+                    <InputField id="creditScore" label="Credit Score" type="number" value={formData.creditScore} onChange={(v: number) => setFormData({...formData, creditScore: v})} error={errors.creditScore} placeholder="300-900" onHelpClick={() => setIsCreditScoreModalOpen(true)} />
                     <InputField id="existingLoans" label="Active Loans count" type="number" value={formData.existingLoans} onChange={(v: number) => setFormData({...formData, existingLoans: v})} error={errors.existingLoans} placeholder="e.g. 1" />
                     
                     <div className="space-y-2">
@@ -702,7 +652,7 @@ export const LoanApplicationForm = () => {
             )}
 
             <div className="flex justify-between mt-8 pt-6 border-t border-border/40">
-              <Button type="button" variant="outline" className="rounded-full px-6 h-12 bg-transparent hover:bg-white/5 border-white/20 transition-all font-medium" onClick={handlePrevious} disabled={currentStep === 1 || isLoading}>
+              <Button type="button" variant="outline" className="rounded-full px-6 h-12 bg-transparent hover:bg-white/5 border-white/20 transition-all font-medium" onClick={handlePrevious} disabled={isLoading}>
                 <ChevronLeft className="h-4 w-4 mr-2" /> Back
               </Button>
 
@@ -723,6 +673,29 @@ export const LoanApplicationForm = () => {
           </form>
         </CardContent>
       </Card>
+
+      <Dialog open={isCreditScoreModalOpen} onOpenChange={setIsCreditScoreModalOpen}>
+        <DialogContent className="sm:max-w-md bg-slate-900 border-slate-800 text-white rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Don't know your credit score?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4 text-sm text-slate-400">
+            <p>You can check it for free using:</p>
+            <ul className="list-disc pl-5 space-y-1 text-slate-300">
+              <li>CIBIL (official website)</li>
+              <li>Paytm app</li>
+              <li>OneScore app</li>
+              <li>Paisabazaar</li>
+            </ul>
+            <p className="font-semibold text-white mt-4">Steps:</p>
+            <ol className="list-decimal pl-5 space-y-1 text-slate-300">
+              <li>Enter your PAN details</li>
+              <li>Verify with OTP</li>
+              <li>View your credit score instantly</li>
+            </ol>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
@@ -736,18 +709,31 @@ interface InputFieldProps {
   onChange: (v: number | string) => void;
   error?: string;
   placeholder?: string;
+  onHelpClick?: () => void;
 }
 
-const InputField = ({ id, label, type, value, onChange, error, placeholder }: InputFieldProps) => (
+const InputField = ({ id, label, type, value, onChange, error, placeholder, onHelpClick }: InputFieldProps) => (
   <div className="space-y-2 group relative">
-    <Label htmlFor={id} className="text-muted-foreground font-medium group-focus-within:text-primary transition-colors">
-      {label}
-    </Label>
+    <div className="flex items-center gap-2">
+      <Label htmlFor={id} className="text-muted-foreground font-medium group-focus-within:text-primary transition-colors">
+        {label}
+      </Label>
+      {onHelpClick && (
+        <HelpCircle 
+          className="w-4 h-4 text-muted-foreground cursor-pointer hover:text-primary transition-colors" 
+          onClick={onHelpClick} 
+        />
+      )}
+    </div>
     <Input
       id={id}
       type={type}
-      value={value || ''}
-      onChange={(e) => onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
+      value={value === 0 ? 0 : (value || '')}
+      onChange={(e) => {
+        if (e.target.value === '') { onChange(''); return; }
+        const parsed = parseFloat(e.target.value);
+        onChange(isNaN(parsed) ? 0 : parsed);
+      }}
       placeholder={placeholder}
       className="h-12 bg-white/5 border-white/10 hover:border-white/20 focus:border-primary focus:ring-primary/30 rounded-xl transition-all w-full text-foreground pl-4 shadow-sm group-focus-within:shadow-md"
     />
