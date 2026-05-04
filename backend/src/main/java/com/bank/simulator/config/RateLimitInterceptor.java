@@ -35,6 +35,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
     /** Config: path-suffix → max allowed requests within WINDOW_MS */
     private static final Map<String, Integer> PATH_LIMITS = Map.of(
+        "/auth/login",           5, 
             "/auth/forgot-password", 5,
             "/auth/reset-password",  10,
             "/account/forgot-pin",   5,

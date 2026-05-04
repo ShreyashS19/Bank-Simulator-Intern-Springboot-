@@ -20,6 +20,7 @@ public class WebConfig implements WebMvcConfigurer {
     public void addInterceptors(@NonNull InterceptorRegistry registry) {
         registry.addInterceptor(rateLimitInterceptor)
                 .addPathPatterns(
+                        "/auth/login",    
                         "/auth/forgot-password",
                         "/auth/reset-password",
                         "/account/forgot-pin",

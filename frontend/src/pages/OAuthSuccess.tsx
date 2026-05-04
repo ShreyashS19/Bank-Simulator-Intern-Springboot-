@@ -1,13 +1,19 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { authService, tokenUtils, User } from "@/services/authService";
 import { ACCOUNT_DEACTIVATED_URL_ERROR, OAUTH_FAILED_URL_ERROR } from "@/lib/authMessages";
+import LoginTransitionOverlay from "@/components/LoginTransitionOverlay";
 
 const OAuthSuccess = () => {
   const navigate = useNavigate();
+  const [transition, setTransition] = useState<{ show: boolean; userName: string; target: string }>({
+    show: false,
+    userName: "",
+    target: "/dashboard",
+  });
 
   useEffect(() => {
     const processOAuthCallback = async () => {
@@ -45,7 +51,13 @@ const OAuthSuccess = () => {
 
         window.history.replaceState({}, document.title, window.location.pathname);
         toast.success("Google login successful");
-        navigate(user.role === "ADMIN" ? "/admin" : "/dashboard", { replace: true });
+        const target = user.role === "ADMIN" ? "/admin" : "/dashboard";
+        setTransition({
+          show: true,
+          userName: user.fullName || user.email,
+          target,
+        });
+        return;
       } catch {
         toast.error("Unable to process Google login response.");
         navigate("/login", { replace: true });
@@ -57,6 +69,12 @@ const OAuthSuccess = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
+      {transition.show && (
+        <LoginTransitionOverlay
+          userName={transition.userName}
+          onComplete={() => navigate(transition.target, { replace: true })}
+        />
+      )}
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Completing Google Sign-In</CardTitle>
