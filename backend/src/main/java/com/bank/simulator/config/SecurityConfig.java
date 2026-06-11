@@ -162,7 +162,7 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
 
     // FIX 1: Read allowed origins from environment/config, not hardcoded
-    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000}")
+    @Value("${app.cors.allowed-origins:http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000}")
     private String allowedOrigins;
 
     @Bean
@@ -219,6 +219,8 @@ public class SecurityConfig {
                         "/auth/forgot-password",
                         "/auth/reset-password"
                 ).permitAll()
+                // Public Sentry test endpoint
+                .requestMatchers(HttpMethod.GET, "/auth/test-sentry").permitAll()
                 // Public OAuth helper endpoints
                 .requestMatchers(HttpMethod.GET, "/oauth/providers", "/oauth-success").permitAll()
 
@@ -237,6 +239,8 @@ public class SecurityConfig {
                 // Loan endpoints - Authenticated users
                 .requestMatchers(HttpMethod.POST, "/loan/apply").authenticated()
                 .requestMatchers(HttpMethod.GET, "/loan/pdf/**", "/loan/account/**", "/loan/*").authenticated()
+                // Aadhaar KYC verification - Authenticated users
+                .requestMatchers("/aadhaar/**").authenticated()
                 // All other requests require authentication
                 .anyRequest().authenticated()
             )
@@ -261,7 +265,9 @@ public class SecurityConfig {
                 "Content-Type",
                 "X-Requested-With",
                 "Accept",
-                "Origin"
+                "Origin",
+                "sentry-trace",
+                "baggage"
         ));
 
         // FIX 6: Expose only necessary response headers

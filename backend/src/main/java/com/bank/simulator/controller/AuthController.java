@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+import io.sentry.Sentry;
+
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -44,7 +46,18 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("User registered successfully", userData));
     }
+    
+    
 
+@GetMapping("/test-sentry")
+public String testSentry() {
+    try {
+        throw new Exception("Sentry backend test - Bank Simulator");
+    } catch (Exception e) {
+        Sentry.captureException(e);
+    }
+    return "Sentry test triggered!";
+}
     /**
      * POST /api/auth/login
      * Authenticate user and return JWT token.

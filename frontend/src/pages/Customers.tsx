@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Search, UserPlus, Loader2, Eye, Edit, Trash2 } from "lucide-react";
+import { Search, UserPlus, Loader2, Eye, Edit, Trash2, CheckCircle } from "lucide-react";
 import { customerService, Customer } from "@/services/customerService";
 import { CustomerViewModal } from "@/components/CustomerViewModal";
 import { CustomerEditModal } from "@/components/CustomerEditModal";
@@ -32,6 +32,16 @@ const Customers = () => {
     dob: "",
     status: "ACTIVE"
   });
+  const requireAadhaarKyc = import.meta.env.VITE_REQUIRE_AADHAAR_KYC !== 'false';
+
+  // Aadhaar verification state
+  const [aadhaarVerified, setAadhaarVerified] = useState(false);
+  const [aadhaarVerifying, setAadhaarVerifying] = useState(false);
+  const [aadhaarOtpSent, setAadhaarOtpSent] = useState(false);
+  const [aadhaarOtp, setAadhaarOtp] = useState("");
+  const [aadhaarClientId, setAadhaarClientId] = useState("");
+  const [aadhaarVerifyError, setAadhaarVerifyError] = useState("");
+  const [maskedAadhaar, setMaskedAadhaar] = useState("");
 
   const handleSearch = async () => {
     if (!aadharSearch.trim()) {
@@ -65,6 +75,57 @@ const Customers = () => {
       }
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleGenerateOtp = async () => {
+    if (!formData.aadharNumber.match(/^\d{12}$/)) {
+      toast.error("Aadhaar number must be exactly 12 digits");
+      return;
+    }
+
+    setAadhaarVerifying(true);
+    setAadhaarVerifyError("");
+
+    try {
+      const response = await customerService.generateAadhaarOtp(formData.aadharNumber);
+      setAadhaarClientId(response.clientId);
+      setAadhaarOtpSent(true);
+      setAadhaarOtp("");
+      toast.success("OTP sent to your Aadhaar-linked mobile");
+    } catch (error: any) {
+      setAadhaarVerifyError(
+        error.response?.data?.message || "Failed to send OTP. Check Aadhaar number."
+      );
+    } finally {
+      setAadhaarVerifying(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!aadhaarOtp.match(/^\d{6}$/)) {
+      toast.error("OTP must be exactly 6 digits");
+      return;
+    }
+
+    setAadhaarVerifying(true);
+    setAadhaarVerifyError("");
+
+    try {
+      const response = await customerService.verifyAadhaarOtp(
+        formData.aadharNumber,
+        aadhaarOtp,
+        aadhaarClientId
+      );
+      setAadhaarVerified(true);
+      setMaskedAadhaar(response.maskedAadhaar);
+      toast.success("Aadhaar verified successfully!");
+    } catch (error: any) {
+      setAadhaarVerifyError(
+        error.response?.data?.message || "OTP verification failed. Try again."
+      );
+    } finally {
+      setAadhaarVerifying(false);
     }
   };
 
@@ -108,6 +169,12 @@ const Customers = () => {
       
       if (!formData.dob) {
         toast.error("Date of birth is required");
+        setIsLoading(false);
+        return;
+      }
+
+      if (requireAadhaarKyc && !aadhaarVerified) {
+        toast.error("Please verify your Aadhaar number before creating a customer");
         setIsLoading(false);
         return;
       }
@@ -233,6 +300,14 @@ const handleEdit = async (customer: Customer) => {
       dob: "",
       status: "ACTIVE"
     });
+    // Reset Aadhaar verification state
+    setAadhaarVerified(false);
+    setAadhaarVerifying(false);
+    setAadhaarOtpSent(false);
+    setAadhaarOtp("");
+    setAadhaarClientId("");
+    setAadhaarVerifyError("");
+    setMaskedAadhaar("");
   };
 
   return (
@@ -323,6 +398,7 @@ const handleEdit = async (customer: Customer) => {
                   />
                 </div>
                 
+                {/* Aadhaar Number with OTP Verification */}
                 <div className="space-y-2">
                   <Label htmlFor="aadharNumber">Aadhar Number <span className="text-red-500">*</span></Label>
                   <Input
@@ -331,13 +407,100 @@ const handleEdit = async (customer: Customer) => {
                     onChange={(e) => {
                       const value = e.target.value.replace(/\D/g, '');
                       if (value.length <= 12) {
+                        // Reset verification state if user changes the Aadhaar number after OTP was sent
+                        if (requireAadhaarKyc && (aadhaarOtpSent || aadhaarVerified)) {
+                          setAadhaarVerified(false);
+                          setAadhaarOtpSent(false);
+                          setAadhaarOtp("");
+                          setAadhaarClientId("");
+                          setAadhaarVerifyError("");
+                          setMaskedAadhaar("");
+                        }
                         setFormData({ ...formData, aadharNumber: value });
                       }
                     }}
                     placeholder="12-digit Aadhar number"
                     required
                     maxLength={12}
+                    disabled={requireAadhaarKyc && (aadhaarVerified || aadhaarOtpSent || aadhaarVerifying)}
                   />
+
+                  {/* Aadhaar verification UI */}
+                  {requireAadhaarKyc && !aadhaarVerified && !aadhaarOtpSent && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleGenerateOtp}
+                      disabled={formData.aadharNumber.length !== 12 || aadhaarVerifying}
+                      className="mt-1"
+                    >
+                      {aadhaarVerifying ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Verifying...
+                        </>
+                      ) : (
+                        "Verify Aadhaar"
+                      )}
+                    </Button>
+                  )}
+
+                  {requireAadhaarKyc && aadhaarOtpSent && !aadhaarVerified && (
+                    <div className="space-y-2 mt-1">
+                      <p className="text-sm text-muted-foreground">
+                        OTP sent to your Aadhaar-linked mobile number.
+                      </p>
+                      <Input
+                        placeholder="Enter 6-digit OTP"
+                        value={aadhaarOtp}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          if (value.length <= 6) {
+                            setAadhaarOtp(value);
+                          }
+                        }}
+                        maxLength={6}
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleVerifyOtp}
+                          disabled={aadhaarOtp.length !== 6 || aadhaarVerifying}
+                        >
+                          {aadhaarVerifying ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              Verifying...
+                            </>
+                          ) : (
+                            "Submit OTP"
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleGenerateOtp}
+                          disabled={aadhaarVerifying}
+                        >
+                          Resend OTP
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {requireAadhaarKyc && aadhaarVerifyError && (
+                    <p className="text-sm text-red-500 mt-1">{aadhaarVerifyError}</p>
+                  )}
+
+                  {requireAadhaarKyc && aadhaarVerified && (
+                    <p className="text-sm text-green-600 flex items-center gap-1 mt-1">
+                      <CheckCircle className="h-4 w-4" /> Aadhaar Verified ({maskedAadhaar})
+                    </p>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
@@ -367,7 +530,11 @@ const handleEdit = async (customer: Customer) => {
               </div>
               
               <div className="flex gap-3">
-                <Button type="submit" disabled={isLoading}>
+                <Button
+                  type="submit"
+                  disabled={(requireAadhaarKyc && !aadhaarVerified) || isLoading}
+                  title={(requireAadhaarKyc && !aadhaarVerified) ? "Please verify the Aadhaar number before proceeding to create the customer account." : undefined}
+                >
                   {isLoading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />

@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,6 +18,7 @@ import AdminLoanManagement from "./pages/AdminLoanManagement";
 import NotFound from "./pages/NotFound";
 import { LoanApplicationForm } from "./components/LoanApplicationForm";
 import ResetPinPage from "./pages/ResetPinPage";
+import { ReportBugButton } from "./components/ReportBugButton";
 
 // ─── Import interceptors to initialize globally ───────────────────────────────
 import './utils/axiosConfig';
@@ -64,107 +66,110 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/oauth-success" element={<OAuthSuccess />} />
+  <Sentry.ErrorBoundary fallback={<p className="p-8 text-center text-red-400">An error has occurred. Our team has been notified.</p>} showDialog>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/oauth-success" element={<OAuthSuccess />} />
 
-          {/* Admin Only */}
-          <Route
-            path="/admin"
-            element={
-              <AdminRoute>
-                <AdminDashboard />
-              </AdminRoute>
-            }
-          />
+            {/* Admin Only */}
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <AdminDashboard />
+                </AdminRoute>
+              }
+            />
 
-          <Route
-            path="/admin/loans"
-            element={
-              <AdminRoute>
-                <AdminLoanManagement />
-              </AdminRoute>
-            }
-          />
+            <Route
+              path="/admin/loans"
+              element={
+                <AdminRoute>
+                  <AdminLoanManagement />
+                </AdminRoute>
+              }
+            />
 
-          {/* Protected Routes */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
+            {/* Protected Routes */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/customers"
-            element={
-              <ProtectedCustomerRoute>
-                <Customers />
-              </ProtectedCustomerRoute>
-            }
-          />
+            <Route
+              path="/customers"
+              element={
+                <ProtectedCustomerRoute>
+                  <Customers />
+                </ProtectedCustomerRoute>
+              }
+            />
 
-          <Route
-            path="/accounts"
-            element={
-              <ProtectedRoute>
-                <Accounts />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/accounts"
+              element={
+                <ProtectedRoute>
+                  <Accounts />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/transactions"
-            element={
-              <ProtectedRoute>
-                <Transactions />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/transactions"
+              element={
+                <ProtectedRoute>
+                  <Transactions />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Loan Routes */}
-          <Route
-            path="/loans"
-            element={
-              <ProtectedRoute>
-                <LoanDashboard />
-              </ProtectedRoute>
-            }
-          />
+            {/* Loan Routes */}
+            <Route
+              path="/loans"
+              element={
+                <ProtectedRoute>
+                  <LoanDashboard />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/loans/apply"
-            element={
-              <ProtectedRoute>
-                <LoanApplicationForm />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/loans/apply"
+              element={
+                <ProtectedRoute>
+                  <LoanApplicationForm />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/reset-pin"
-            element={
-              <ProtectedRoute>
-                <ResetPinPage />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/reset-pin"
+              element={
+                <ProtectedRoute>
+                  <ResetPinPage />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+        <ReportBugButton />
+      </TooltipProvider>
+    </QueryClientProvider>
+  </Sentry.ErrorBoundary>
 );
 
 export default App;

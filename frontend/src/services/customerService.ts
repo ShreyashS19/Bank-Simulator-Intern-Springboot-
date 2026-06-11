@@ -123,5 +123,53 @@ export const customerService = {
       console.error(' Error deleting customer:', error);
       throw error;
     }
+  },
+
+  generateAadhaarOtp: async (aadhaarNumber: string): Promise<{ clientId: string; message: string }> => {
+    try {
+      const response = await axios.post<ApiResponse<{ clientId: string; maskedAadhaar: string; message: string }>>(
+        `${API_BASE_URL}/aadhaar/generate-otp`,
+        { aadhaarNumber },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        }
+      );
+      return {
+        clientId: response.data.data.clientId,
+        message: response.data.data.message || response.data.message
+      };
+    } catch (error: any) {
+      console.error('Error generating Aadhaar OTP:', error.response?.data || error);
+      throw error;
+    }
+  },
+
+  verifyAadhaarOtp: async (
+    aadhaarNumber: string,
+    otp: string,
+    clientId: string
+  ): Promise<{ verified: boolean; maskedAadhaar: string }> => {
+    try {
+      const response = await axios.post<ApiResponse<{ verified: boolean; maskedAadhaar: string; message: string }>>(
+        `${API_BASE_URL}/aadhaar/verify-otp`,
+        { aadhaarNumber, otp, clientId },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        }
+      );
+      return {
+        verified: response.data.data.verified,
+        maskedAadhaar: response.data.data.maskedAadhaar
+      };
+    } catch (error: any) {
+      console.error('Error verifying Aadhaar OTP:', error.response?.data || error);
+      throw error;
+    }
   }
 };

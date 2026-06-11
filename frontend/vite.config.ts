@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 import path from 'path'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 
 export default defineConfig(({ mode }) => ({
   server: {
@@ -31,6 +32,11 @@ export default defineConfig(({ mode }) => ({
 
   plugins: [
     react(),
+    sentryVitePlugin({
+      org: 'bank-simulation-project',
+      project: 'javascript-react',
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+    }),
   ].filter(Boolean),
 
   resolve: {
@@ -39,9 +45,9 @@ export default defineConfig(({ mode }) => ({
     },
   },
 
-  // FIX: Don't expose source maps in production — leaks internal logic
+  // Enable source maps for Sentry stack traces
   build: {
-    sourcemap: mode === 'development',
+    sourcemap: true,
     // FIX: Chunk size warning threshold
     chunkSizeWarningLimit: 600,
   },

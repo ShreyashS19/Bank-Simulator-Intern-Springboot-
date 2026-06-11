@@ -1,4 +1,5 @@
 import axios from 'axios';
+import * as Sentry from '@sentry/react';
 import '../utils/axiosConfig'; // Initialize interceptors
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
@@ -123,6 +124,8 @@ export const tokenUtils = {
     localStorage.removeItem('isAdmin');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('hasCustomerRecord');
+    // Clear Sentry user context on logout
+    Sentry.setUser(null);
   },
 
   /**
@@ -135,6 +138,12 @@ export const tokenUtils = {
     localStorage.setItem('isAuthenticated', 'true');
     localStorage.setItem('isAdmin', user.role === 'ADMIN' ? 'true' : 'false');
     localStorage.setItem('userEmail', user.email);
+    // Set Sentry user context so all errors include user identity
+    Sentry.setUser({
+      email: user.email,
+      username: user.fullName,
+      id: user.id,
+    });
   },
 };
 

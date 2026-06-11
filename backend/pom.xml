@@ -80,6 +80,12 @@
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
+        
+        <dependency>
+            <groupId>io.sentry</groupId>
+            <artifactId>sentry-spring-boot-starter-jakarta</artifactId>
+            <version>7.14.0</version>
+        </dependency>
 
         <!-- JWT - jjwt 0.12.x -->
         <dependency>
@@ -179,4 +185,39 @@
         </plugins>
     </build>
 
+    <!-- Sentry source-bundle upload — only active when SENTRY_AUTH_TOKEN is set -->
+    <profiles>
+        <profile>
+            <id>sentry</id>
+            <activation>
+                <property>
+                    <name>env.SENTRY_AUTH_TOKEN</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>io.sentry</groupId>
+                        <artifactId>sentry-maven-plugin</artifactId>
+                        <version>0.11.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <org>bank-simulation-project</org>
+                            <project>java-spring-boot</project>
+                            <authToken>${env.SENTRY_AUTH_TOKEN}</authToken>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>uploadSourceBundle</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>
+

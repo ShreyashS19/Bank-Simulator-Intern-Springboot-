@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import * as Sentry from "@sentry/react";
 import { authService, tokenUtils, User } from "@/services/authService";
 import { ACCOUNT_DEACTIVATED_URL_ERROR, OAUTH_FAILED_URL_ERROR } from "@/lib/authMessages";
 import LoginTransitionOverlay from "@/components/LoginTransitionOverlay";

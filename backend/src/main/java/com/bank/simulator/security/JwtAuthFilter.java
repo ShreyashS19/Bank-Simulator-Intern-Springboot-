@@ -16,6 +16,8 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import io.sentry.Sentry;
+
 import java.io.IOException;
 import java.util.List;
 
@@ -75,6 +77,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                         log.debug("JWT authenticated using DB fallback for user: {}", email);
                     }
                 }
+
+                // Set Sentry user context so all errors in this request include the user
+                io.sentry.protocol.User sentryUser = new io.sentry.protocol.User();
+                sentryUser.setUsername(email);
+                Sentry.setUser(sentryUser);
             }
         } catch (Exception ex) {
             log.warn("JWT validation failed: {}", ex.getMessage());
